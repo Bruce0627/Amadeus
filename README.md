@@ -1,4 +1,3 @@
-# Amadeus
 # Amadeus System：加入簡易自主生活
 
 [English](README.en.md)
