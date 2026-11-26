@@ -1,0 +1,754 @@
+"""Todo command validation and legacy lexical diagnostics for AMADEUS.
+
+Todo state is authoritative in SQLite.  This module deliberately does not open
+files, execute reminders, call a model, or render UI. ``classify_*`` remains
+for compatibility diagnostics and read-only candidate prefiltering; it has no
+authority to route or authorize a write.  New semantic decisions use
+``agent.schedule_architecture.ScheduleIntent``.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
+import re
+from typing import Any, Literal, Mapping, Sequence
+
+from agent.schedule_time import normalize_time_spec
+from agent.task_recurrence import normalize_recurrence_rule as _normalize_recurrence_rule
+
+
+TodoRequestKind = Literal["none", "query", "mutation"]
+TodoAction = Literal[
+    "list", "create", "update", "complete", "reopen", "delete", "snooze",
+    "pause", "resume",
+]
+
+TODO_STATUSES = frozenset({
+    "pending", "in_progress", "paused", "completed", "deleted",
+})
+TODO_PRIORITIES = frozenset({"low", "normal", "high"})
+TODO_RECURRENCE_RULES = frozenset({"", "daily", "weekly", "weekdays", "monthly"})
+TODO_ACTIONS = frozenset({
+    "list", "create", "update", "complete", "reopen", "delete", "snooze",
+    "pause", "resume",
+})
+TODO_TARGET_STATUSES = frozenset({
+    "", "active", "pending", "in_progress", "paused", "completed", "deleted", "all",
+})
+TODO_DELIVERY_CHANNELS = frozenset({"desktop", "qq"})
+TODO_DELIVERY_TARGET_TYPES = frozenset({"private", "group"})
+# ``manual`` is the safe model-facing default. ``delivery`` is an explicit
+# contract for a one-shot reminder whose obligation is the successful
+# notification itself. ``legacy`` is storage-only and is used when an old
+# database row predates this field.
+TODO_COMPLETION_MODES = frozenset({"manual", "delivery", "legacy"})
+TODO_NOOP_TARGET_FIELDS = (
+    "title", "details", "status", "priority", "dueAt", "dueDate", "allDay",
+    "timezone", "deliveryTarget", "remindBeforeMinutes", "recurrenceRule", "snoozedUntil",
+)
+TODO_NOOP_REQUESTABLE_FIELDS = (
+    "title", "details", "onDue", "status", "priority", "dueAt", "dueDate", "timezone",
+    "deliveryTarget", "remindBeforeMinutes", "recurrenceRule", "snoozedUntil",
+)
+
+
+def normalize_completion_mode(value: Any, *, default: str = "manual") -> str:
+    """Normalize the structured post-delivery completion contract.
+
+    ``legacy`` is retained only as a storage compatibility value.  Missing or
+    malformed values always fall back to the safe ``manual`` default; new
+    model commands use ``manual`` unless they explicitly select ``delivery``.
+    """
+
+    text = str(value or default).strip().lower().replace("-", "_")
+    if text in {"after_delivery", "delivery_ack", "acknowledged"}:
+        text = "delivery"
+    if text not in TODO_COMPLETION_MODES:
+        raise ValueError("todo_invalid_completion_mode")
+    return text
+
+
+def _ascii_digits(value: Any) -> str:
+    if isinstance(value, bool) or value is None:
+        return ""
+    text = str(value).strip()
+    return text if text and all("0" <= char <= "9" for char in text) else ""
+
+
+def normalize_delivery_target(value: Any, *, allow_owner_reference: bool = False) -> dict[str, str]:
+    """Normalize an explicit Todo delivery target without inferring a channel.
+
+    An omitted or empty target preserves the legacy desktop reminder behavior.
+    QQ targets are intentionally structural: the caller must provide numeric
+    account and recipient IDs, and prose in ``details`` never selects QQ.
+    """
+
+    if value in (None, ""):
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError("todo_invalid_delivery_target")
+    if not value:
+        return {}
+    allowed = {"channel", "accountId", "targetType", "targetId", "recipient"}
+    if set(value) - allowed:
+        raise ValueError("todo_invalid_delivery_target")
+    channel = str(value.get("channel") or "").strip().lower()
+    if not channel:
+        raise ValueError("todo_invalid_delivery_target")
+    if channel == "desktop":
+        # Explicit desktop is useful for a round-trip update, but never carries
+        # a partially specified QQ destination.
+        if any(str(value.get(key) or "").strip() for key in ("accountId", "targetType", "targetId", "recipient")):
+            raise ValueError("todo_invalid_delivery_target")
+        return {"channel": "desktop"}
+    if channel != "qq":
+        raise ValueError("todo_invalid_delivery_target")
+    if (allow_owner_reference and value.get('recipient', 'owner') == 'owner'
+            and value.get('targetType', 'private') == 'private'
+            and not value.get('accountId') and not value.get('targetId')):
+        return {'channel': 'qq', 'recipient': 'owner'}
+    if 'recipient' in value:
+        raise ValueError('todo_invalid_delivery_target')
+    account_id = _ascii_digits(value.get("accountId"))
+    target_id = _ascii_digits(value.get("targetId"))
+    target_type = str(value.get("targetType") or "").strip().lower()
+    if (
+        not account_id or len(account_id) > 64
+        or not target_id or len(target_id) > 64
+        or target_type not in TODO_DELIVERY_TARGET_TYPES
+    ):
+        raise ValueError("todo_invalid_delivery_target")
+    return {
+        "channel": "qq",
+        "accountId": account_id,
+        "targetType": target_type,
+        "targetId": target_id,
+    }
+
+
+def is_qq_delivery_target(value: Any) -> bool:
+    """Return whether a persisted target explicitly selects QQ."""
+
+    try:
+        return normalize_delivery_target(value).get("channel") == "qq"
+    except ValueError:
+        return False
+
+_TODO_NOUN = re.compile(r"待办|任务|todo(?:\s*list)?|日程|提醒|计划事项", re.I)
+_TODO_MUTATION = re.compile(
+    r"提醒我|到点叫我|记得叫我|加入|添加|新增|创建|记下|安排|设置|"
+    r"改到|改成|修改|调整|提前|推迟|延后|稍后提醒|完成了|做完了|打勾|"
+    r"重新打开|恢复任务|取消|删除|移除",
+    re.I,
+)
+_TODO_QUERY = re.compile(
+    r"(?:还有|有|查看|看看|列出|显示|告诉我).{0,12}(?:待办|任务|日程|安排|计划)|"
+    r"(?:待办|任务|日程|安排|计划).{0,12}(?:是什么|有哪些|还有什么|做什么|情况)|"
+    r"我(?:今天|明天|上午|下午|晚上|本周|这周)?(?:本来)?(?:要|该|应该|计划)"
+    r".{0,10}(?:做什么|干什么|完成什么)",
+    re.I,
+)
+_TODO_NON_COMMITTING = re.compile(
+    r"(?:^|[，,。；;\s])(?:先)?(?:别|不要|不用|不必|无需).{0,16}"
+    r"(?:提醒|添加|新增|创建|记下|安排|设置|修改|调整|提前|推迟|延后|完成|删除|移除)|"
+    r"(?:还没|尚未|并未|没有|未曾|没).{0,12}"
+    r"(?:完成|做完|写完|玩完|打完|看完|读完|弄完|搞定|结束|提交)|"
+    r"^(?:如果|假如|假设|要是).{0,80}(?:会怎样|会怎么样|怎么样|如何|可以吗|能否|是否)",
+    re.I,
+)
+
+
+def normalize_todo_recurrence_rule(value: Any) -> str:
+    """Return the storage-owned canonical recurrence rule."""
+
+    raw = str(value or "").strip()
+    if not raw or raw.lower() == "none":
+        return ""
+    try:
+        normalized = _normalize_recurrence_rule(raw)
+    except (TypeError, ValueError):
+        return ""
+    return str(normalized or "").strip()
+
+
+def _nonnegative_int(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def classify_todo_request(text: str) -> TodoRequestKind:
+    """Classify only the local Todo capability, never public-web freshness.
+
+    False positives on ``query`` are intentionally harmless: they can only load
+    the user's local task list.  Mutations still require a model-produced,
+    schema-valid command and the side-effect validation gate.
+    """
+
+    value = " ".join(str(text or "").split()).strip()
+    if not value:
+        return "none"
+    if _TODO_NON_COMMITTING.search(value):
+        return "query" if _TODO_NOUN.search(value) else "none"
+    if _TODO_MUTATION.search(value) and (
+        _TODO_NOUN.search(value)
+        or re.search(r"提醒我|到点叫我|记得叫我|做完了|完成了", value, re.I)
+    ):
+        return "mutation"
+    if _TODO_NOUN.search(value) or _TODO_QUERY.search(value):
+        return "query"
+    return "none"
+
+
+def recent_todo_action_context(
+    messages: Sequence[Mapping[str, Any]] | None,
+) -> dict[str, Any]:
+    """Return the immediately preceding accepted Todo action, if any.
+
+    Assistant prose is not evidence that a side effect happened. A short
+    follow-up such as ``改到两点半`` may inherit a target only from the latest
+    assistant message's accepted ``todo_manage`` action receipt.
+    """
+
+    for message in reversed(tuple(messages or ())[-8:]):
+        if str(message.get("role") or "").strip().lower() != "assistant":
+            continue
+        containers: list[Mapping[str, Any]] = [message]
+        for key in ("meta", "metadata"):
+            value = message.get(key)
+            if isinstance(value, Mapping):
+                containers.append(value)
+        for container in containers:
+            receipt = container.get("actionReceipt")
+            if not isinstance(receipt, Mapping):
+                continue
+            tool = str(
+                receipt.get("tool")
+                or receipt.get("toolName")
+                or container.get("toolUsed")
+                or ""
+            ).strip()
+            status = str(receipt.get("status") or "").strip().lower()
+            task_id = str(
+                receipt.get("resolvedTarget")
+                or receipt.get("taskId")
+                or ""
+            ).strip()[:100]
+            if tool == "todo_manage" and status == "accepted" and task_id:
+                return {
+                    "taskId": task_id,
+                    "actionId": str(receipt.get("actionId") or "").strip()[:100],
+                    "taskVersion": _nonnegative_int(
+                        receipt.get("taskVersionAfter")
+                        or receipt.get("taskVersion")
+                        or 0
+                    ),
+                }
+        # Only the nearest assistant turn can establish an implicit target.
+        return {}
+    return {}
+
+
+def recent_todo_task_ids(
+    messages: Sequence[Mapping[str, Any]] | None,
+) -> tuple[str, ...]:
+    """Collect authoritative task references carried by recent turn metadata."""
+
+    collected: list[str] = []
+    for message in reversed(tuple(messages or ())[-24:]):
+        if str(message.get("role") or "").strip().lower() != "assistant":
+            continue
+        containers: list[Mapping[str, Any]] = [message]
+        for key in ("meta", "metadata"):
+            value = message.get(key)
+            if isinstance(value, Mapping):
+                containers.append(value)
+        for container in containers:
+            todo_context = container.get("todoContext")
+            if isinstance(todo_context, Mapping):
+                raw_ids = (
+                    todo_context.get("recentTaskIds")
+                    or todo_context.get("recent_task_ids")
+                    or ()
+                )
+                if isinstance(raw_ids, (list, tuple)):
+                    collected.extend(str(item).strip() for item in raw_ids if str(item).strip())
+            receipt = container.get("actionReceipt")
+            if isinstance(receipt, Mapping) and str(receipt.get("status") or "").lower() == "accepted":
+                tool = str(receipt.get("tool") or container.get("toolUsed") or "")
+                task_id = str(receipt.get("resolvedTarget") or receipt.get("taskId") or "").strip()
+                if tool == "todo_manage" and task_id:
+                    collected.append(task_id)
+    return tuple(dict.fromkeys(item[:100] for item in collected))[:12]
+
+
+def classify_todo_request_with_context(
+    text: str,
+    messages: Sequence[Mapping[str, Any]] | None = None,
+) -> TodoRequestKind:
+    """Classify direct Todo intent plus an immediate receipt-grounded follow-up."""
+
+    direct = classify_todo_request(text)
+    if direct != "none":
+        return direct
+    value = " ".join(str(text or "").split()).strip()
+    if _TODO_MUTATION.search(value) and recent_todo_action_context(messages):
+        return "mutation"
+    return "none"
+
+
+def todo_request_targets_recent_receipt(
+    text: str,
+    messages: Sequence[Mapping[str, Any]] | None = None,
+) -> bool:
+    """Whether a mutation explicitly points back to the receipt-bound task."""
+
+    if not recent_todo_action_context(messages):
+        return False
+    value = " ".join(str(text or "").split()).strip()
+    if classify_todo_request(value) == "none" and _TODO_MUTATION.search(value):
+        return True
+    if classify_todo_request(value) == "mutation" and not _TODO_NOUN.search(value):
+        return True
+    return bool(re.search(
+        r"这(?:个|项)|它|刚才(?:那(?:个|项))?|刚刚(?:那(?:个|项))?|"
+        r"上(?:一|面)(?:个|项)?|上述|该(?:任务|待办|日程|提醒)",
+        value,
+        re.I,
+    ))
+
+
+def todo_mutation_explicitly_requested(
+    text: str,
+    messages: Sequence[Mapping[str, Any]] | None = None,
+) -> bool:
+    return classify_todo_request_with_context(text, messages) == "mutation"
+
+
+def todo_mutation_prohibited(text: str) -> bool:
+    """Deterministic veto for negated or explicitly hypothetical side effects."""
+
+    value = " ".join(str(text or "").split()).strip()
+    return bool(value and _TODO_NON_COMMITTING.search(value))
+
+
+def parse_due_at(value: Any, *, local_timezone=None) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    candidate = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        fallback = local_timezone or datetime.now().astimezone().tzinfo or timezone.utc
+        parsed = parsed.replace(tzinfo=fallback)
+    return parsed.astimezone(timezone.utc)
+
+
+def normalized_due_at(value: Any, *, local_timezone=None) -> str:
+    parsed = parse_due_at(value, local_timezone=local_timezone)
+    return parsed.isoformat(timespec="seconds") if parsed else ""
+
+
+def normalize_todo_noop_target(value: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """Normalize a complete user-goal target for a verified no-op.
+
+    The target describes the state requested by the current user turn.  It is
+    deliberately separate from an ordinary ``keep`` decision: a model must
+    first resolve the requested fields and inherit every unspecified field from
+    the current candidate.  Partial/extra structures cannot stand in for a
+    database readback.
+    """
+
+    required_fields = set(TODO_NOOP_TARGET_FIELDS) - {"deliveryTarget"}
+    if (not isinstance(value, Mapping) or not required_fields.issubset(value)
+            or set(value) - {*TODO_NOOP_TARGET_FIELDS, "onDue"}
+            or not isinstance(value.get("onDue", ""), str)):
+        return None
+    text_fields = (
+        "title", "details", "status", "priority", "dueAt", "dueDate",
+        "timezone", "recurrenceRule", "snoozedUntil",
+    )
+    if any(not isinstance(value.get(key), str) for key in text_fields):
+        return None
+    if not isinstance(value.get("allDay"), bool):
+        return None
+    if (
+        isinstance(value.get("remindBeforeMinutes"), bool)
+        or not isinstance(value.get("remindBeforeMinutes"), int)
+        or not 0 <= value["remindBeforeMinutes"] <= 7 * 24 * 60
+    ):
+        return None
+    due_at_input = value["dueAt"].strip()
+    due_at = normalized_due_at(due_at_input)
+    if due_at_input and not due_at:
+        return None
+    due_date_input = value["dueDate"].strip()
+    if due_date_input:
+        try:
+            due_date = date.fromisoformat(due_date_input).isoformat()
+        except ValueError:
+            return None
+    else:
+        due_date = ""
+    status = value["status"].strip().lower()
+    priority = value["priority"].strip().lower()
+    recurrence_input = value["recurrenceRule"].strip()
+    recurrence_rule = normalize_todo_recurrence_rule(recurrence_input)
+    snoozed_until_input = value["snoozedUntil"].strip()
+    snoozed_until = normalized_due_at(snoozed_until_input)
+    if snoozed_until_input and not snoozed_until:
+        return None
+    try:
+        delivery_target = normalize_delivery_target(value.get("deliveryTarget", {}))
+    except ValueError:
+        return None
+    if (
+        status not in TODO_STATUSES
+        or priority not in TODO_PRIORITIES
+        or (recurrence_input and not recurrence_rule)
+        or (due_at and due_date)
+        or value["allDay"] != (not bool(due_at))
+    ):
+        return None
+    return {
+        "title": value["title"].strip(),
+        "details": value["details"].strip(),
+        **({"onDue": value["onDue"].strip()} if value.get("onDue", "").strip() else {}),
+        "status": status,
+        "priority": priority,
+        "dueAt": due_at,
+        "dueDate": due_date,
+        "allDay": value["allDay"],
+        "timezone": value["timezone"].strip(),
+        "deliveryTarget": delivery_target,
+        "remindBeforeMinutes": value["remindBeforeMinutes"],
+        "recurrenceRule": recurrence_rule,
+        "snoozedUntil": snoozed_until,
+    }
+
+
+def todo_noop_target_matches(
+    candidate: Mapping[str, Any] | None,
+    target: Mapping[str, Any] | None,
+) -> bool:
+    """Compare a candidate and model target after the same strict normalization."""
+
+    current = normalize_todo_noop_target(
+        {
+            key: candidate.get(key, "")
+            for key in (*TODO_NOOP_TARGET_FIELDS, "onDue")
+        }
+        if isinstance(candidate, Mapping)
+        and all(key in candidate for key in TODO_NOOP_TARGET_FIELDS if key != "deliveryTarget")
+        else None
+    )
+    wanted = normalize_todo_noop_target(target)
+    return current is not None and wanted is not None and current == wanted
+
+
+def clamp_remind_before_minutes(value: Any) -> int:
+    try:
+        minutes = int(value)
+    except (TypeError, ValueError):
+        minutes = 0
+    return max(0, min(7 * 24 * 60, minutes))
+
+
+def normalize_priority(value: Any) -> str:
+    priority = str(value or "normal").strip().lower()
+    return priority if priority in TODO_PRIORITIES else "normal"
+
+
+@dataclass(frozen=True)
+class TodoTargetRef:
+    """Model-facing task reference; SQLite remains responsible for resolution."""
+
+    task_id: str = ""
+    title: str = ""
+    query: str = ""
+    status: str = "active"
+    due_after: str = ""
+    due_before: str = ""
+    ordinal: int = 0
+    relative: str = ""
+    recent_task_ids: tuple[str, ...] = ()
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any] | str | None) -> "TodoTargetRef":
+        data: Mapping[str, Any] = (
+            value if isinstance(value, Mapping)
+            else {"query": str(value or "")}
+        )
+        status = str(data.get("status") or data.get("scope") or "active").strip().lower()
+        if status not in TODO_TARGET_STATUSES:
+            status = "active"
+        try:
+            ordinal = int(data.get("ordinal") or data.get("index") or 0)
+        except (TypeError, ValueError):
+            ordinal = 0
+        recent_raw = data.get("recentTaskIds") or data.get("recent_task_ids") or ()
+        recent_ids = tuple(dict.fromkeys(
+            str(item).strip()[:100]
+            for item in (recent_raw if isinstance(recent_raw, (list, tuple)) else ())
+            if str(item).strip()
+        ))[:12]
+        due_after_input = (
+            data.get("dueAfter") if "dueAfter" in data else data.get("due_after")
+        )
+        due_before_input = (
+            data.get("dueBefore") if "dueBefore" in data else data.get("due_before")
+        )
+        due_after = normalized_due_at(due_after_input)
+        due_before = normalized_due_at(due_before_input)
+        if due_after_input not in (None, "") and not due_after:
+            raise ValueError("todo_invalid_due_after")
+        if due_before_input not in (None, "") and not due_before:
+            raise ValueError("todo_invalid_due_before")
+        return cls(
+            task_id=str(data.get("taskId") or data.get("task_id") or "").strip()[:100],
+            title=" ".join(str(data.get("title") or "").split()).strip()[:240],
+            query=" ".join(str(data.get("query") or data.get("text") or "").split()).strip()[:500],
+            status=status,
+            due_after=due_after,
+            due_before=due_before,
+            ordinal=max(0, min(500, ordinal)),
+            relative=str(data.get("relative") or data.get("relativeReference") or "").strip()[:80],
+            recent_task_ids=recent_ids,
+        )
+
+    @property
+    def has_selector(self) -> bool:
+        return bool(
+            self.task_id or self.title or self.query or self.ordinal
+            or self.relative or self.recent_task_ids
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "taskId": self.task_id,
+            "title": self.title,
+            "query": self.query,
+            "status": self.status,
+            "dueAfter": self.due_after,
+            "dueBefore": self.due_before,
+            "ordinal": self.ordinal,
+            "relative": self.relative,
+            "recentTaskIds": list(self.recent_task_ids),
+        }
+
+
+@dataclass(frozen=True)
+class TodoCommand:
+    action: TodoAction
+    task_id: str = ""
+    title: str = ""
+    details: str = ""
+    on_due: str = ""
+    due_at: str = ""
+    due_date: str = ""
+    timezone_name: str = ""
+    delivery_target: dict[str, str] = field(default_factory=dict)
+    completion_mode: str = "manual"
+    remind_before_minutes: int = 0
+    priority: str = "normal"
+    recurrence_rule: str = ""
+    snooze_minutes: int = 0
+    snooze_until: str = ""
+    scope: str = "active"
+    target_ref: TodoTargetRef = TodoTargetRef()
+    expected_version: int = 0
+    commit_intent: bool = False
+    provided_fields: tuple[str, ...] = ()
+    time_spec: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> "TodoCommand":
+        # Normalize explicit wire aliases before identity calculation and
+        # storage. Never derive delivery from prose or silently lose a channel.
+        value = dict(value)
+        if "dueAt" not in value and "due_at" not in value and "remindAt" in value:
+            value["dueAt"] = value["remindAt"]
+        if "deliveryTarget" not in value and "delivery_target" not in value:
+            channel = value.get("deliveryChannel")
+            if channel in {"qq", "qq_private"}:
+                if value.get("targetId") or value.get("accountId"):
+                    value["deliveryTarget"] = {"channel": "qq", "accountId": value.get("accountId"),
+                        "targetType": value.get("targetType", "private"), "targetId": value.get("targetId")}
+                else:
+                    value["deliveryTarget"] = {"channel": "qq", "recipient": value.get("recipient", "owner")}
+            elif channel == "desktop":
+                value["deliveryTarget"] = {"channel": "desktop"}
+        action = str(value.get("action") or "list").strip().lower()
+        if action not in TODO_ACTIONS:
+            raise ValueError("invalid_todo_action")
+        title = " ".join(str(value.get("title") or "").split()).strip()[:240]
+        target_ref = TodoTargetRef.from_mapping(
+            value.get("targetRef") or value.get("target_ref")
+        )
+        task_id = str(
+            value.get("taskId") or value.get("task_id") or target_ref.task_id or ""
+        ).strip()[:100]
+        if action == "create" and not title:
+            raise ValueError("todo_title_required")
+        if (
+            action in {"update", "complete", "reopen", "delete", "snooze", "pause", "resume"}
+            and not task_id
+            and not target_ref.has_selector
+        ):
+            raise ValueError("todo_target_required")
+        try:
+            snooze_minutes = int(value.get("snoozeMinutes") or value.get("snooze_minutes") or 0)
+        except (TypeError, ValueError):
+            snooze_minutes = 0
+        try:
+            expected_version = int(
+                value.get("expectedVersion") or value.get("expected_version") or 0
+            )
+        except (TypeError, ValueError):
+            expected_version = 0
+        due_input = value.get("dueAt") if "dueAt" in value else value.get("due_at")
+        due_at = normalized_due_at(due_input)
+        if due_input not in (None, "") and not due_at:
+            raise ValueError("todo_invalid_due_at")
+        delivery_input = (
+            value.get("deliveryTarget")
+            if "deliveryTarget" in value else value.get("delivery_target")
+        )
+        delivery_target = normalize_delivery_target(delivery_input, allow_owner_reference=True)
+        completion_input = (
+            value.get("completionMode")
+            if "completionMode" in value else value.get("completion_mode")
+        )
+        completion_mode = normalize_completion_mode(completion_input, default="manual")
+        if completion_mode == "legacy":
+            raise ValueError("todo_invalid_completion_mode")
+        due_date = str(value.get("dueDate", value.get("due_date", "")) or "").strip()
+        if due_date:
+            try:
+                if date.fromisoformat(due_date).isoformat() != due_date:
+                    raise ValueError()
+            except ValueError:
+                raise ValueError("todo_invalid_due_date") from None
+        if due_at and due_date:
+            raise ValueError("todo_conflicting_due_time")
+        time_spec = normalize_time_spec(value.get("timeSpec"))
+        if time_spec and (due_date or action not in {"create", "update"}):
+            raise ValueError("todo_conflicting_time_spec")
+        if time_spec.get("kind") == "existing_date" and action != "update":
+            raise ValueError("todo_time_existing_task_required")
+        recurrence_input = str(
+            value.get("recurrenceRule") or value.get("recurrence_rule") or ""
+        ).strip()
+        if recurrence_input.lower() == "none":
+            recurrence_input = ""
+        recurrence_rule = normalize_todo_recurrence_rule(recurrence_input)
+        if recurrence_input and not recurrence_rule:
+            raise ValueError("todo_invalid_recurrence_rule")
+        snooze_input = (
+            value.get("snoozeUntil")
+            if "snoozeUntil" in value else value.get("snooze_until")
+        )
+        snooze_until = normalized_due_at(snooze_input)
+        if snooze_input not in (None, "") and not snooze_until:
+            raise ValueError("todo_invalid_snooze_until")
+        aliases = {
+            "title": ("title",),
+            "details": ("details",),
+            "onDue": ("onDue",),
+            "dueAt": ("dueAt", "due_at"),
+            "dueDate": ("dueDate", "due_date"),
+            "timeSpec": ("timeSpec",),
+            "timezone": ("timezone", "timezoneName"),
+            "deliveryTarget": ("deliveryTarget", "delivery_target"),
+            "completionMode": ("completionMode", "completion_mode"),
+            "remindBeforeMinutes": (
+                "remindBeforeMinutes", "remind_before_minutes",
+            ),
+            "priority": ("priority",),
+            "recurrenceRule": ("recurrenceRule", "recurrence_rule"),
+            "snoozeMinutes": ("snoozeMinutes", "snooze_minutes"),
+            "snoozeUntil": ("snoozeUntil", "snooze_until"),
+            "scope": ("scope",),
+        }
+        provided_fields = tuple(
+            public_name
+            for public_name, incoming_names in aliases.items()
+            if any(incoming_name in value for incoming_name in incoming_names)
+        )
+        return cls(
+            action=action,  # type: ignore[arg-type]
+            task_id=task_id,
+            title=title,
+            details=str(value.get("details") or "").strip(),
+            on_due=str(value.get("onDue") or "").strip(),
+            due_at=due_at,
+            due_date=due_date,
+            timezone_name=str(
+                value.get("timezone") or value.get("timezoneName") or ""
+            ).strip()[:80],
+            delivery_target=delivery_target,
+            completion_mode=completion_mode,
+            remind_before_minutes=clamp_remind_before_minutes(
+                value.get("remindBeforeMinutes", value.get("remind_before_minutes", 0))
+            ),
+            priority=normalize_priority(value.get("priority")),
+            recurrence_rule=recurrence_rule,
+            snooze_minutes=max(1, min(30 * 24 * 60, snooze_minutes)) if snooze_minutes else 0,
+            snooze_until=snooze_until,
+            scope=str(value.get("scope") or "active").strip().lower()[:32],
+            target_ref=target_ref,
+            expected_version=max(0, expected_version),
+            commit_intent=bool(value.get("commitIntent") or value.get("commit_intent")),
+            provided_fields=provided_fields,
+            time_spec=time_spec,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "action": self.action,
+            "taskId": self.task_id,
+            "targetRef": self.target_ref.to_dict(),
+            "expectedVersion": self.expected_version,
+            "commitIntent": self.commit_intent,
+        }
+        values = {
+            "title": self.title,
+            "details": self.details,
+            "onDue": self.on_due,
+            "dueAt": self.due_at,
+            "dueDate": self.due_date,
+            "timezone": self.timezone_name,
+            "deliveryTarget": dict(self.delivery_target),
+            "completionMode": self.completion_mode,
+            "remindBeforeMinutes": self.remind_before_minutes,
+            "priority": self.priority,
+            "recurrenceRule": self.recurrence_rule,
+            "snoozeMinutes": self.snooze_minutes,
+            "snoozeUntil": self.snooze_until,
+            "scope": self.scope,
+            "timeSpec": self.time_spec,
+        }
+        if self.action == "create":
+            result.update(values)
+            if "deliveryTarget" not in self.provided_fields and not self.delivery_target:
+                # Preserve omission through schedule/plan canonicalization so
+                # the authenticated transport can supply its reply destination.
+                result.pop("deliveryTarget", None)
+            if not self.on_due:
+                # Keep ordinary reminders' pre-existing executable identity.
+                result.pop("onDue", None)
+            if "completionMode" not in self.provided_fields:
+                # Keep the wire shape compatible with older model/tool
+                # callers; the validated command still carries the safe
+                # ``manual`` default into the storage service.
+                result.pop("completionMode", None)
+        else:
+            result.update({key: values[key] for key in self.provided_fields})
+        if not self.time_spec:
+            result.pop("timeSpec", None)
+        return result

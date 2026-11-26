@@ -1,0 +1,1981 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="/live2d/local_api.js?v=20260910-local-session"></script>
+    <title>Amadeus 系統</title>
+    <script src="locale-zh-tw-data.js"></script>
+    <script src="locale-zh-tw.js"></script>
+    <link rel="stylesheet" href="live2d.css?v=20261113-clear-stage">
+  </head>
+  <body>
+    <section class="boot-sequence" id="bootSequence" aria-hidden="true">
+      <div class="boot-terminal" id="bootTerminal" aria-hidden="true">
+        <div>Amadeus 系統 ver.2.037/rev.211</div>
+        <div>初始化系統 ............... 完成</div>
+        <div>連接開機裝置 .......... 完成</div>
+        <div>選擇作業系統控制裝置 ..... 完成</div>
+        <div class="boot-terminal-gap"></div>
+        <div>處理器 0 已啟用 ........ 完成</div>
+        <div>處理器 1 已啟用 ........ 完成</div>
+        <div>處理器 2 已啟用 ........ 完成</div>
+        <div>處理器 3 已啟用 ........ 完成</div>
+        <div>處理器 4 已啟用 ........ 完成</div>
+        <div>處理器 5 已啟用 ........ 完成</div>
+        <div>處理器 6 已啟用 ........ 完成</div>
+        <div>處理器 7 已啟用 ........ 完成</div>
+        <div>初始化記憶體 32768/32768bytes</div>
+        <div class="boot-terminal-gap"></div>
+        <div>正在啟動核心 2.04 版...</div>
+        <div>掛載 proc 至 /proc .......... [ 完成 ]</div>
+        <div>掛載 sysfs 至 /sys .......... [ 完成 ]</div>
+        <div>偵測網路 ............... [ 完成 ]</div>
+        <div>設定本機位址 ............ [ 完成 ]</div>
+        <div>設定路由 ............... [ 完成 ]</div>
+        <div>載入系統映像 ............ [ 完成 ]</div>
+        <div>解壓縮檔案 ............. [ 完成 ]</div>
+        <div>啟動顯示服務 ..................... [ 完成 ]</div>
+      </div>
+      <div class="boot-network-grid" aria-hidden="true"><i></i></div>
+      <div class="boot-logo-stage" aria-hidden="true">
+        <div class="boot-logo-frame">
+          <video id="bootLogoVideo" muted playsinline preload="auto">
+            <source src="/assets/boot/amadeus_logo_sequence.mp4" type="video/mp4">
+          </video>
+          <img class="boot-logo-fallback" src="/assets/amadeus_logo_original.png" alt="">
+        </div>
+      </div>
+      <div class="boot-horizontal-noise" aria-hidden="true"></div>
+      <div class="boot-scanlines" aria-hidden="true"></div>
+    </section>
+    <canvas id="stage"></canvas>
+    <div id="proactiveWaitingIndicator" class="proactive-waiting-indicator" role="status" aria-live="polite" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 15.4A8.5 8.5 0 0 1 8.6 4.5 8.5 8.5 0 1 0 19.5 15.4Z"/><path d="m15.5 4 .5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5-1.5-.5 1.5-.5Z"/></svg>
+    </div>
+    <div class="window-resize-handle" data-window-resize="n" title="拖動縮放視窗" aria-hidden="true"></div>
+    <div class="window-resize-handle" data-window-resize="s" title="拖動縮放視窗" aria-hidden="true"></div>
+    <div class="window-resize-handle" data-window-resize="e" title="拖動縮放視窗" aria-hidden="true"></div>
+    <div class="window-resize-handle" data-window-resize="w" title="拖動縮放視窗" aria-hidden="true"></div>
+    <div class="window-resize-handle" data-window-resize="ne" title="拖動縮放視窗" aria-hidden="true"></div>
+    <div class="window-resize-handle" data-window-resize="nw" title="拖動縮放視窗" aria-hidden="true"></div>
+    <div class="window-resize-handle" data-window-resize="se" title="拖動縮放視窗" aria-hidden="true"></div>
+    <div class="window-resize-handle" data-window-resize="sw" title="拖動縮放視窗" aria-hidden="true"></div>
+
+    <div class="window-drag-strip pywebview-drag-region" data-window-drag title="拖動視窗" aria-hidden="true"></div>
+    <!-- AMADEUS_RELEASE_STRIP_START:developer-touch-overlay -->
+    <div class="dev-touch-overlay hidden" id="devTouchOverlay" aria-hidden="true"></div>
+    <!-- AMADEUS_RELEASE_STRIP_END:developer-touch-overlay -->
+
+    <section class="hud" id="hud">
+      <div
+        class="chat-resize-handle"
+        id="chatResizeHandle"
+        role="separator"
+        aria-label="調整對話面板高度"
+        aria-orientation="horizontal"
+        aria-valuemin="220"
+        aria-valuemax="736"
+        aria-valuenow="330"
+        tabindex="0"
+        title="拖動對話面板上邊緣以調整高度"
+      ><span aria-hidden="true"></span></div>
+      <div class="titlebar" id="dragRegion">
+        <button id="pinWindowBtn" class="is-pinned titlebar-leading-action" type="button" title="取消視窗置頂" aria-label="取消視窗置頂" aria-pressed="true">
+          <svg class="pin-line-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 3h8M9 3l1 6-3 3v2h10v-2l-3-3 1-6M12 14v7M10.5 19.5 12 22l1.5-2.5" />
+          </svg>
+        </button>
+        <div class="titlebar-drag-region pywebview-drag-region" data-window-drag title="拖動視窗">
+          <strong>Amadeus 系統</strong>
+          <span id="modelState">正在初始化 Live2D</span>
+        </div>
+        <div class="window-actions">
+          <!-- AMADEUS_RELEASE_STRIP_START:developer-entry -->
+          <button class="source-only" id="developerEntryBtn" type="button" title="開啟獨立開發者視窗" aria-label="開啟獨立開發者視窗">
+            <svg class="developer-line-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14.7 6.3a4.2 4.2 0 0 0-5.3 5.3L4 17l3 3 5.4-5.4a4.2 4.2 0 0 0 5.3-5.3l-2.4 2.4-3-3z"></path>
+            </svg>
+          </button>
+          <!-- AMADEUS_RELEASE_STRIP_END:developer-entry -->
+          <button id="newConversationBtn" type="button" title="對話與新建" aria-label="選擇或新建對話" aria-haspopup="dialog" aria-expanded="false">
+            <svg class="new-chat-line-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 5h14v11H9l-4 3V5z"></path>
+              <path d="M12 8v5M9.5 10.5h5"></path>
+            </svg>
+          </button>
+          <button id="bookmarkBtn" type="button" title="網頁收藏" aria-label="網頁收藏" aria-expanded="false">
+            <svg class="bookmark-line-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path>
+            </svg>
+          </button>
+          <button id="settingsBtn" type="button" title="開啟設定" aria-label="開啟設定">⚙</button>
+          <button id="toggleChatBtn" type="button" title="收起對話方塊" aria-label="收起對話方塊" aria-expanded="true">v</button>
+          <button id="closeAppBtn" type="button" title="退出">×</button>
+        </div>
+      </div>
+
+      <!-- AMADEUS_RELEASE_STRIP_START:developer-quick-actions -->
+      <div class="quick-actions dev-only">
+        <button data-emotion="thinking" data-gesture="nod" type="button">思考</button>
+        <button data-emotion="annoyed" data-gesture="tilt" type="button">吐槽</button>
+        <button data-emotion="shy" data-gesture="lean" type="button">害羞</button>
+        <button data-emotion="concerned" data-gesture="soften" type="button">關心</button>
+        <button data-emotion="excited" data-gesture="glitch" type="button">興奮</button>
+      </div>
+      <!-- AMADEUS_RELEASE_STRIP_END:developer-quick-actions -->
+
+      <div class="chat-wrap" id="chatWrap">
+        <section class="conversation-picker hidden" id="conversationPicker" aria-label="選擇對話">
+          <header class="conversation-picker-head">
+            <div><strong>對話</strong><span id="conversationPickerCount">0 個</span></div>
+            <button id="conversationPickerCloseBtn" type="button" title="關閉對話列表" aria-label="關閉對話列表">×</button>
+          </header>
+          <button class="conversation-create-btn" id="conversationCreateBtn" type="button">
+            <span aria-hidden="true">＋</span><span>新建對話</span>
+          </button>
+          <div class="conversation-picker-status" id="conversationPickerStatus" aria-live="polite">正在讀取對話…</div>
+          <div class="conversation-picker-list" id="conversationPickerList"></div>
+        </section>
+        <section class="chat-history-search hidden" id="chatHistorySearchPanel" aria-label="查詢聊天紀錄">
+          <div class="chat-history-search-head">
+            <label class="chat-history-search-box">
+              <svg class="search-line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="10.5" cy="10.5" r="6.5"></circle>
+                <path d="m15.5 15.5 5 5"></path>
+              </svg>
+              <input id="chatHistorySearchInput" type="search" maxlength="120" autocomplete="off" placeholder="搜尋聊天紀錄">
+            </label>
+            <button id="closeChatHistorySearchBtn" type="button" title="關閉查詢" aria-label="關閉查詢">×</button>
+          </div>
+          <div class="chat-history-search-filters" role="tablist" aria-label="訊息傳送者">
+            <button class="active" type="button" data-history-role="all" role="tab" aria-selected="true">全部</button>
+            <button type="button" data-history-role="user" role="tab" aria-selected="false">我</button>
+            <button type="button" data-history-role="assistant" role="tab" aria-selected="false">Amadeus 系統</button>
+          </div>
+          <div class="chat-history-search-status" id="chatHistorySearchStatus" aria-live="polite">輸入關鍵詞，或瀏覽最近記錄</div>
+          <div class="chat-history-search-results" id="chatHistorySearchResults"></div>
+          <div class="chat-history-search-footer">
+            <button id="chatHistorySearchPrevBtn" type="button" disabled>上一頁</button>
+            <span id="chatHistorySearchPage">第 1 頁</span>
+            <button id="chatHistorySearchNextBtn" type="button" disabled>下一頁</button>
+          </div>
+        </section>
+        <section class="bookmark-panel hidden" id="bookmarkPanel" aria-label="網頁收藏">
+          <header class="bookmark-panel-head">
+            <div><strong>網頁收藏</strong><span id="bookmarkCount">0 個</span></div>
+            <div>
+              <button id="bookmarkRefreshBtn" type="button" title="重新整理收藏" aria-label="重新整理收藏">↻</button>
+              <button id="bookmarkCloseBtn" type="button" title="關閉收藏夾" aria-label="關閉收藏夾">×</button>
+            </div>
+          </header>
+          <form class="bookmark-quick-form" id="bookmarkQuickForm">
+            <input id="bookmarkQuickName" maxlength="120" autocomplete="off" placeholder="稱呼，例如：實驗室" required>
+            <input id="bookmarkQuickUrl" type="url" maxlength="4096" autocomplete="off" placeholder="https://example.com" required>
+            <button type="submit">收藏</button>
+          </form>
+          <div class="bookmark-list" id="bookmarkList"></div>
+          <div class="bookmark-empty" id="bookmarkEmpty">還沒有收藏網頁。</div>
+          <form class="bookmark-editor hidden" id="bookmarkEditor">
+            <div class="bookmark-editor-head">
+              <strong>編輯收藏</strong>
+              <button id="bookmarkEditorCancelBtn" type="button" aria-label="關閉編輯器">×</button>
+            </div>
+            <label>稱呼<input id="bookmarkEditorName" maxlength="120" required></label>
+            <label>網址<input id="bookmarkEditorUrl" type="url" maxlength="4096" required></label>
+            <div class="bookmark-editor-actions">
+              <button id="bookmarkEditorDeleteBtn" class="danger" type="button">刪除</button>
+              <button type="submit">儲存</button>
+            </div>
+          </form>
+        </section>
+        <div class="chat-log" id="chatLog"></div>
+        <form class="chat-form" id="chatForm">
+        <details class="qq-activity" id="qqActivity" hidden>
+          <summary id="qqActivitySummary" aria-live="polite">QQ 動態</summary>
+          <div class="qq-activity-body">
+            <button id="qqConfigureBtn" type="button">管理 QQ</button>
+            <div class="qq-activity-list" id="qqActivityList"></div>
+            <span class="hint">完整配置請開啟設定 → QQ。</span>
+          </div>
+        </details>
+          <input id="attachmentInput" type="file" multiple hidden>
+          <div class="reply-anchor-preview hidden" id="replyAnchorPreview" aria-live="polite">
+            <span><strong id="replyAnchorLabel">回覆訊息</strong><small id="replyAnchorText"></small></span>
+            <button id="cancelReplyAnchorBtn" type="button" title="取消回覆" aria-label="取消回覆">×</button>
+          </div>
+          <div class="attachment-tray hidden" id="attachmentTray" aria-live="polite"></div>
+          <div class="composer-tools" id="composerTools" aria-label="當前選擇的工具" hidden></div>
+          <div class="tool-picker-menu" id="toolPickerMenu" role="menu" aria-label="新增圖片、檔案或工具" hidden></div>
+          <div class="chat-compose-row">
+            <button class="attach-file-btn" id="attachFileBtn" type="button" title="新增圖片、檔案或工具" aria-label="新增圖片、檔案或工具" aria-haspopup="menu" aria-controls="toolPickerMenu" aria-expanded="false">＋</button>
+            <textarea id="userInput" rows="1" autocomplete="off" placeholder="輸入訊息，或新增圖片/檔案..." aria-label="訊息"></textarea>
+            <button type="button" class="attach-file-btn" id="wenshengMic"
+                    aria-label="語音輸入" aria-pressed="false" title="語音輸入">🎙</button>
+            <button class="send-message-btn" id="chatSubmitBtn" type="submit" title="傳送" aria-label="傳送">
+              <svg class="send-line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3.5 4.5 21 12 3.5 19.5l2-6.1L14 12l-8.5-1.4z"></path>
+              </svg>
+              <svg class="stop-line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="6" y="6" width="12" height="12" rx="1"></rect>
+              </svg>
+            </button>
+          </div>
+          <div class="chat-drop-hint" id="chatDropHint" aria-hidden="true">鬆開以新增圖片或檔案</div>
+        </form>
+      </div>
+    </section>
+
+    <!-- AMADEUS_RELEASE_STRIP_START:developer-panel -->
+    <section class="dev-panel hidden" id="developerPanel" data-active-page="voice">
+      <header>
+        <strong>開發者模式</strong>
+        <span id="devVoiceStatus">IDLE</span>
+        <button class="dev-panel-collapse-btn" id="devPanelCollapseBtn" type="button" title="收起開發者側欄" aria-label="收起開發者側欄" aria-expanded="true">
+          <span aria-hidden="true">›</span>
+        </button>
+      </header>
+      <nav class="dev-tabs" aria-label="開發者工具頁籤">
+        <button data-dev-tab="overview" type="button">總覽</button>
+        <button data-dev-tab="emotion" type="button">情緒</button>
+        <button class="active" data-dev-tab="voice" type="button">語音</button>
+        <button data-dev-tab="touch" type="button">觸控</button>
+        <button data-dev-tab="model" type="button">模型</button>
+        <button data-dev-tab="training" type="button">訓練</button>
+        <button data-dev-tab="persona" type="button">人格</button>
+        <button data-dev-tab="relationship" type="button">關係</button>
+      </nav>
+      <div class="dev-block" data-dev-page="overview">
+        <div class="dev-block-title">
+          <b>執行狀態</b>
+          <div class="dev-inline-actions">
+            <button id="devRefreshRuntimeBtn" type="button">重新整理</button>
+            <button id="devCopyDiagnosticsBtn" type="button">複製診斷</button>
+          </div>
+        </div>
+        <pre id="devRuntimeSummary">loading...</pre>
+      </div>
+      <div class="dev-block persona-skill-monitor" data-dev-page="persona" id="devPersonaSkillMonitor">
+        <div class="dev-block-title">
+          <b>本輪人格 技能</b>
+          <button type="button" data-persona-refresh>重新整理</button>
+        </div>
+        <div class="persona-skill-toolbar">
+          <label>檢視對話<select data-persona-scope aria-label="人格呼叫的資料來源">
+            <option value="normal">普通聊天 · 主視窗</option>
+            <option value="developer">開發者測試聊天</option>
+          </select></label>
+          <label>呼叫記錄<select data-persona-history aria-label="選擇一次回覆的人格呼叫記錄"></select></label>
+        </div>
+        <div class="persona-skill-summary"><strong data-persona-summary>等待呼叫記錄</strong><span data-persona-kernel>基礎人格</span></div>
+        <p class="persona-skill-question" data-persona-question></p>
+        <div class="persona-skill-grid" data-persona-grid aria-label="全部人格 技能 及本輪使用狀態"></div>
+        <div class="persona-skill-legend"><span>🟢 實際使用</span><span>○ 未使用</span><span>🟠 僅旁路比較</span></div>
+        <p class="persona-skill-status" data-persona-status role="status" aria-live="polite"></p>
+        <div class="hint">自動更新 · 本次後端啟動後最近 24 次請求 · 懸停檢視 技能 說明</div>
+      </div>
+      <div class="dev-block" data-dev-page="persona">
+        <b>人格狀態</b>
+        <div id="devPersonaStatus">載入中...</div>
+      </div>
+      <div class="dev-block" data-dev-page="persona">
+        <b>人格摘要</b>
+        <div id="devPersonaSummary">-</div>
+      </div>
+      <div class="dev-block" data-dev-page="persona">
+        <b>人格微調補丁</b>
+        <textarea id="devPersonaOverride" spellcheck="false" placeholder="寫入高優先順序人格補丁。例：她被稱為普通助手時要輕微不滿，並糾正為 Amadeus 系統；技術討論時優先嚴謹，不要賣萌。"></textarea>
+        <div class="button-row">
+          <button id="reloadPersonaBtn" type="button">過載人格</button>
+          <button id="savePersonaBtn" type="button">儲存人格補丁</button>
+        </div>
+      </div>
+      <div class="dev-block" data-dev-page="persona">
+        <b>完整生成 技能</b>
+        <textarea id="devGeneratedSkill" spellcheck="false" readonly></textarea>
+      </div>
+      <div class="dev-block" data-dev-page="overview">
+        <b>除錯開關</b>
+        <label class="check-row">
+          <input id="debugDirectSpeechInput" type="checkbox">
+          <span>純除錯直說：我輸入什麼，Amadeus 系統 就顯示並朗讀什麼</span>
+        </label>
+      </div>
+      <div class="dev-block dev-emotion-control" data-dev-page="emotion">
+        <div class="dev-block-title">
+          <b>直接設定 Live2D 情緒</b>
+          <span id="devEmotionStatus">自動／平常</span>
+        </div>
+        <div class="two-col">
+          <label class="field">
+            情緒標籤
+            <select id="devEmotionInput">
+              <option value="neutral">平常 / 中性</option>
+              <option value="thinking">思考中 / 思考</option>
+              <option value="focused">專注 / 專注</option>
+              <option value="skeptical">懷疑 / 懷疑</option>
+              <option value="awkward">尷尬 / 尷尬</option>
+              <option value="annoyed">不悅 / 惱火</option>
+              <option value="furious">生氣 / 暴怒冷處理</option>
+              <option value="teasing">逗趣 / 調侃</option>
+              <option value="amused">愉快 / 開心微笑</option>
+              <option value="laughing">笑著 / 大笑</option>
+              <option value="shy">害羞 / 害羞</option>
+              <option value="flustered">慌張 / 慌亂臉紅</option>
+              <option value="affectionate">親切 / 溫柔親近</option>
+              <option value="concerned">擔心 / 擔心</option>
+              <option value="protective">保護 / 保護</option>
+              <option value="excited">興奮 / 興奮</option>
+              <option value="startled">吃驚 / 震驚、意外、受驚</option>
+              <option value="proud">得意 / 得意</option>
+              <option value="melancholic">低落 / 低落</option>
+            </select>
+          </label>
+          <label class="field">
+            同時觸發動作
+            <select id="devGestureInput">
+              <option value="idle">待命 / 無動作</option>
+              <option value="nod">點頭 / 點頭</option>
+              <option value="tilt">歪頭 / 歪頭</option>
+              <option value="look_away">移開視線 / 側頭</option>
+              <option value="lean">靠近 / 靠近</option>
+              <option value="soften">放鬆 / 放鬆</option>
+              <option value="smile">微笑 / 閉眼笑</option>
+              <option value="laugh">大笑 / 大笑動作</option>
+              <option value="recoil">後退 / 後退</option>
+              <option value="explain">說明 / 解釋</option>
+              <option value="perk">振作 / 振奮</option>
+              <option value="tap">輕觸 / 輕觸</option>
+              <option value="glitch">故障 / 故障</option>
+              <option value="boot">啟動 / 啟動</option>
+            </select>
+          </label>
+        </div>
+        <div class="two-col dev-emotion-ranges">
+          <label class="field">
+            情緒強度 <output id="devEmotionIntensityValue">1.00</output>
+            <input id="devEmotionIntensityInput" type="range" min="0.15" max="2.5" step="0.01" value="1">
+            <span class="hint">左側是模型原始強度，右側是“兩端更密、中間更少”的最終視覺強度。</span>
+          </label>
+          <label class="field">
+            臉紅強度 <output id="devEmotionBlushValue">0%</output>
+            <input id="devEmotionBlushInput" type="range" min="0" max="100" step="1" value="0" list="devEmotionBlushScale">
+            <span class="dev-percent-scale" aria-hidden="true"><i>0%</i><i>25%</i><i>50%</i><i>75%</i><i>100%</i></span>
+            <datalist id="devEmotionBlushScale">
+              <option value="0"></option>
+              <option value="25"></option>
+              <option value="50"></option>
+              <option value="75"></option>
+              <option value="100"></option>
+            </datalist>
+          </label>
+        </div>
+        <label class="check-row">
+          <input id="devEmotionLockInput" type="checkbox">
+          <span>鎖定手動情緒，阻止對話、觸控與自動恢復臨時覆蓋（動作仍按自身時長播放）</span>
+        </label>
+        <div class="button-row">
+          <button id="devApplyEmotionBtn" type="button">應用情緒</button>
+          <button id="devReleaseEmotionBtn" type="button">恢復自動控制</button>
+        </div>
+        <div class="hint">該控制僅作用於當前開發者視窗，不儲存到設定，也不會修改模型檔案。</div>
+      </div>
+      <div class="dev-block dev-training-workbench" id="devTrainingBrowser" data-dev-page="training">
+        <div class="dev-block-title">
+          <div>
+            <b>訓練資料</b>
+            <div class="hint">這裡先收集你的監督標註，不會自動改寫正式情緒對映。完成一批樣本後，再用修訂資料分析非線性關係。</div>
+          </div>
+          <span id="devTrainingStatus">尚未載入</span>
+        </div>
+        <div class="dev-training-subtabs" role="tablist" aria-label="訓練型別">
+          <button class="active" id="devTrainingExpressionTab" data-training-kind="expression" type="button" role="tab" aria-selected="true">表情</button>
+          <button id="devTrainingVoiceReferenceTab" data-training-kind="voice-reference" type="button" role="tab" aria-selected="false">聲音 / 參考音</button>
+          <button type="button" role="tab" disabled title="為後續訓練型別預留">動作（預留）</button>
+          <button type="button" role="tab" disabled title="為後續訓練型別預留">其他（預留）</button>
+        </div>
+        <div class="dev-training-subpanel" id="devExpressionTrainingBrowserContent">
+          <div class="dev-training-toolbar">
+            <label class="field dev-training-filter">
+              查詢可編輯圖
+              <input id="devTrainingFilterInput" type="search" placeholder="標籤、情緒、強度、備註">
+            </label>
+            <label class="field">
+              情緒篩選
+              <select id="devTrainingEmotionFilter">
+                <option value="">全部情緒</option>
+              </select>
+            </label>
+            <label class="field">
+              執行狀態
+              <select id="devTrainingRuntimeFilter">
+                <option value="">全部執行狀態</option>
+                <option value="active">啟用中</option>
+                <option value="stale">執行版本較舊</option>
+                <option value="inactive">未啟用</option>
+              </select>
+            </label>
+            <div class="dev-inline-actions">
+              <button id="devTrainingNewBtn" type="button">新建</button>
+              <button id="devTrainingDuplicateBtn" type="button" disabled>複製所選</button>
+            </div>
+          </div>
+          <div class="dev-training-gallery" id="devTrainingGallery" aria-label="表情可編輯圖大圖示列表"></div>
+        </div>
+        <div class="dev-training-subpanel hidden" id="devVoiceReferenceBrowserContent" hidden>
+          <div class="dev-training-toolbar">
+            <label class="field dev-training-filter">
+              查詢參考音
+              <input id="devVoiceReferenceFilterInput" type="search" placeholder="情緒、強度、檔名、參考文字">
+            </label>
+            <label class="field">
+              原音質量
+              <select id="devVoiceReferenceStatusFilter">
+                <option value="">全部原音質量</option>
+                <option value="unreviewed">未審閱</option>
+                <option value="approved">合格</option>
+                <option value="rejected">不合格</option>
+              </select>
+            </label>
+            <label class="field">
+              對映狀態
+              <select id="devVoiceReferenceRuntimeFilter">
+                <option value="">全部使用狀態</option>
+                <option value="active">啟用中</option>
+                <option value="inactive">未啟用</option>
+                <option value="audition">試聽候選</option>
+                <option value="replacement">替換候選</option>
+              </select>
+            </label>
+            <label class="field">
+              合成風險
+              <select id="devVoiceReferenceSystemFilter">
+                <option value="">全部合成風險</option>
+                <option value="eligible">可合成</option>
+                <option value="high_risk">高風險</option>
+                <option value="disqualified">禁用</option>
+                <option value="missing">檔案缺失</option>
+              </select>
+            </label>
+            <div class="dev-inline-actions">
+              <button id="devVoiceReferenceRefreshBtn" type="button">重新整理列表</button>
+            </div>
+          </div>
+          <div class="dev-voice-reference-alert hidden" id="devVoiceReferenceAttentionBanner" role="status"></div>
+          <div class="dev-training-gallery" id="devVoiceReferenceGallery" aria-label="情緒參考音大圖示列表"></div>
+          <div class="hint" id="devVoiceReferenceStatus">尚未載入參考音</div>
+        </div>
+      </div>
+      <div class="dev-block dev-training-editor hidden" id="devTrainingEditor" data-dev-page="training">
+        <div class="dev-block-title">
+          <div>
+            <b>編輯所選表情</b>
+            <div class="hint" id="devTrainingEditorHint">點選上方可編輯圖後，在 Live2D 畫面中微調。</div>
+          </div>
+          <button id="devTrainingCloseEditorBtn" type="button">← 返回表情列表</button>
+        </div>
+        <div class="two-col">
+          <label class="field">
+            你的標籤
+            <input id="devTrainingLabelInput" type="text" maxlength="120">
+          </label>
+          <label class="field">
+            我原先建議的標籤
+            <input id="devTrainingRecommendedLabelInput" type="text" readonly>
+          </label>
+          <label class="field">
+            情緒類別
+            <select id="devTrainingEmotionInput"></select>
+          </label>
+          <label class="field">
+            典型強度
+            <select id="devTrainingStrengthInput">
+              <option value="subtle">輕微 / 輕微</option>
+              <option value="typical">典型 / 一般</option>
+              <option value="strong">強烈 / 強烈</option>
+              <option value="custom">自定義 / 自訂</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          連續強度 <output id="devTrainingIntensityValue">1.00</output>
+          <input id="devTrainingIntensityInput" type="range" min="0" max="2.5" step="0.01" value="1">
+        </label>
+        <div class="two-col">
+          <label class="field">
+            標籤（逗號分隔）
+            <input id="devTrainingTagsInput" type="text" maxlength="600" placeholder="例如：嘴角上揚, 眼神柔和, 側頭">
+          </label>
+          <label class="field">
+            備註
+            <textarea id="devTrainingNotesInput" maxlength="2000" placeholder="記錄哪裡不自然、你為什麼這樣改。"></textarea>
+          </label>
+        </div>
+        <div class="dev-training-warning" id="devTrainingCouplingWarning"></div>
+        <section class="dev-training-effective-output">
+          <div class="dev-training-effective-heading">
+            <b>實時綜合輸出</b>
+            <span>直接輸入值 → 情緒層淨影響 → 最終合成值（只要層改變了瞳孔、眼睛、嘴或臉紅，這裡就同步顯示）</span>
+          </div>
+          <div class="dev-training-effective-grid" id="devTrainingEffectiveOutputs"></div>
+        </section>
+        <div class="dev-training-parameter-list" id="devTrainingParameterControls"></div>
+        <div class="button-row dev-training-actions">
+          <button id="devTrainingSaveBtn" type="button">儲存當前編輯</button>
+          <button id="devTrainingRestoreBtn" type="button">重置為預設並儲存</button>
+          <button id="devTrainingApplyBtn" type="button">重新應用到模型</button>
+          <button id="devTrainingActivateBtn" type="button">啟用為真實表情</button>
+          <button id="devTrainingResetRuntimeBtn" type="button">恢復此情緒的內建表情</button>
+        </div>
+        <div class="hint" id="devTrainingRuntimeStatus">“儲存”只記錄你的修訂；“啟用為真實表情”才會把當前已儲存版本接入自動情緒執行時。執行狀態和你的修訂標記彼此獨立。</div>
+      </div>
+      <div class="dev-block dev-training-editor hidden" id="devVoiceReferenceEditor" data-dev-page="training">
+        <div class="dev-block-title">
+          <div>
+            <b>審閱參考音</b>
+            <div class="hint" id="devVoiceReferenceEditorHint">分別確認原音質量、你聽到的情緒，以及它是否適合當前用途。</div>
+          </div>
+          <button id="devVoiceReferenceCloseEditorBtn" type="button">← 返回參考音列表</button>
+        </div>
+        <div class="dev-voice-reference-summary" id="devVoiceReferenceSummary"></div>
+        <div class="dev-voice-reference-compare" id="devVoiceReferenceCompare">
+          <label class="dev-voice-reference-player" id="devVoiceReferenceOriginalPlayer">
+            <span>原參考音</span>
+            <audio id="devVoiceReferenceOriginalAudio" controls preload="metadata"></audio>
+          </label>
+          <label class="dev-voice-reference-player">
+            <span id="devVoiceReferenceCandidateLabel">當前參考音</span>
+            <audio id="devVoiceReferenceAudio" controls preload="metadata"></audio>
+          </label>
+        </div>
+        <div class="hint dev-voice-reference-change" id="devVoiceReferenceChangeInfo"></div>
+        <div class="two-col">
+          <label class="field">
+            實際影響的情緒 / 強度
+            <textarea id="devVoiceReferenceMappings" readonly></textarea>
+          </label>
+          <label class="field">
+            參考音原文
+            <textarea id="devVoiceReferenceTranscript" readonly></textarea>
+          </label>
+          <label class="field">
+            原音質量
+            <select id="devVoiceReferenceReviewStatusInput">
+              <option value="unreviewed">未審閱</option>
+              <option value="approved">合格</option>
+              <option value="rejected">不合格</option>
+            </select>
+          </label>
+          <label class="field">
+            你聽到的情緒標籤
+            <input id="devVoiceReferenceEmotionLabelInput" type="text" maxlength="160" placeholder="例如：小懊惱、嘴硬調侃、小害羞">
+          </label>
+          <label class="field">
+            當前用途的標籤匹配
+            <select id="devVoiceReferenceMappingFitInput">
+              <option value="unreviewed">未判斷</option>
+              <option value="matched">匹配</option>
+              <option value="mismatched">不匹配（原音仍可用）</option>
+            </select>
+          </label>
+          <label class="field">
+            備註
+            <textarea id="devVoiceReferenceNotesInput" maxlength="2000" placeholder="例如：害羞感不足、音色偏沙、尾部靜音太長。"></textarea>
+          </label>
+        </div>
+        <fieldset class="dev-voice-reference-reasons" id="devVoiceReferenceReasons">
+          <legend>問題記錄（可多選；兩個維度互不覆蓋）</legend>
+          <label><input type="checkbox" value="timbre_mismatch" data-review-axis="quality"> 原音：音色偏離</label>
+          <label><input type="checkbox" value="noise_or_hoarse" data-review-axis="quality"> 原音：噪聲、沙啞或悶</label>
+          <label><input type="checkbox" value="silence_or_duration" data-review-axis="quality"> 原音：靜音或時長異常</label>
+          <label><input type="checkbox" value="text_mismatch" data-review-axis="quality"> 原音：參考文字不匹配</label>
+          <label><input type="checkbox" value="other" data-review-axis="quality"> 原音：其他問題</label>
+          <label><input type="checkbox" value="emotion_weak" data-review-axis="mapping"> 當前用途：情緒不明顯</label>
+          <label><input type="checkbox" value="emotion_mismatch" data-review-axis="mapping"> 當前用途：情緒標籤錯誤（原音可重標）</label>
+        </fieldset>
+        <div class="button-row dev-training-actions">
+          <button class="hidden" id="devVoiceReferenceSelectCandidateBtn" type="button">選擇為待晉升候選（不會立即應用）</button>
+          <button id="devVoiceReferenceSaveBtn" type="button">儲存標註</button>
+          <button id="devVoiceReferenceResetBtn" type="button">重置為未審閱</button>
+        </div>
+        <div class="hint">“對映狀態”只回答它是否真實接入 effective 語氣對照表；“合成風險”記錄生成穩定性；“原音質量”記錄素材本身；“標籤匹配”只評價當前用途。標籤不匹配不會再把好音訊標成不合格。“試聽選擇”只記錄偏好，不會修改 語氣對照表、重啟 TTS 或立即應用；替換候選只在原始碼開發版生效。</div>
+      </div>
+      <div class="dev-block" data-dev-page="voice">
+        <div class="dev-block-title">
+          <b>語音操作</b>
+          <div class="dev-inline-actions">
+            <button id="devTestVoiceBtn" type="button">播放測試語音</button>
+            <button id="devRestartVoiceBtn" type="button">重啟語音服務</button>
+            <button id="devOpenVoiceSettingsBtn" type="button">聲音設定</button>
+          </div>
+        </div>
+        <pre id="devVoiceDiagnostic">尚无语音请求</pre>
+      </div>
+      <div class="dev-block" data-dev-page="voice">
+        <b>語義解碼 / 停止過程</b>
+        <div class="hint">顯示每次嘗試生成了多少語義 詞元、為何停止，以及停止前後得到的實際有效語音；只增加診斷，不改變合成行為。</div>
+        <pre id="devVoiceStopDiagnostic">尚无停止过程数据</pre>
+      </div>
+      <div class="dev-block" data-dev-page="voice">
+        <b>最近語音事件</b>
+        <pre id="devVoiceEvents">-</pre>
+      </div>
+      <div class="dev-block dev-touch-help" data-dev-page="touch">
+        <b>點選互動分割槽</b>
+        <div>彩色框直接覆蓋當前模型命中區。座標是相對人物包圍框的歸一化值；軀幹未標色區域只用於普通點選，不傳送互動事件。</div>
+        <div class="dev-zone-legend">
+          <span data-zone="head">頭部：剋制開心</span>
+          <span data-zone="face">臉部：害羞</span>
+          <span data-zone="mouth">嘴部：按關係階段判定親吻</span>
+          <span data-zone="hand">手部：安心/親近</span>
+          <span data-zone="chest">胸部：越界/生氣</span>
+        </div>
+      </div>
+      <div class="dev-block" data-dev-page="touch">
+        <b>最近一次命中</b>
+        <pre id="devTouchHit">尚未点击人物</pre>
+      </div>
+      <div class="dev-block" data-dev-page="touch">
+        <b>實際傳送給 助理 的結構化事件</b>
+        <pre id="devTouchEvent">-</pre>
+      </div>
+      <div class="dev-block" data-dev-page="touch">
+        <b>實際傳送給 助理 的隱藏提示</b>
+        <pre id="devTouchPrompt">-</pre>
+      </div>
+      <div class="dev-block" data-dev-page="touch">
+        <b>模型原始輸出 / 規範化結果</b>
+        <pre id="devTouchResult">-</pre>
+      </div>
+      <div class="dev-block" data-dev-page="model">
+        <div class="dev-block-title">
+          <b>Live2D 皮膚預覽</b>
+          <div class="dev-inline-actions">
+            <button id="devPreviewModelBtn" type="button">預覽所選皮膚</button>
+            <button id="devReloadModelsBtn" type="button">過載配置</button>
+          </div>
+        </div>
+        <label class="field">
+          皮膚
+          <select id="devModelProfileInput"></select>
+        </label>
+        <div class="hint" id="devModelProfileHint">選擇隻影響開發者預覽，不修改普通模式當前設定。</div>
+      </div>
+      <div class="dev-block" data-dev-page="model">
+        <b>每皮膚構圖微調</b>
+        <div class="three-col">
+          <label class="field">
+            模型縮放倍率
+            <input id="devModelScaleInput" type="number" min="0.5" max="2.5" step="0.01">
+          </label>
+          <label class="field">
+            基準 X 偏移
+            <input id="devModelOffsetXInput" type="number" min="-1200" max="1200" step="1">
+          </label>
+          <label class="field">
+            基準 Y 偏移
+            <input id="devModelOffsetYInput" type="number" min="-1200" max="1200" step="1">
+          </label>
+        </div>
+      </div>
+      <div class="dev-block dev-parameter-lab" data-dev-page="model">
+        <div class="dev-block-title">
+          <div>
+            <b>基礎表情標定臺</b>
+            <div class="hint">預設只顯示能直接組合臉部表情的基礎引數。作者預製表情層不會參與標定；自動情緒、眨眼、視線和口型會被凍結。</div>
+          </div>
+          <div class="dev-inline-actions">
+            <button id="devStartNeutralCalibrationBtn" type="button">從模型預設臉開始</button>
+            <button id="devStartCurrentCalibrationBtn" type="button">以當前畫面為起點</button>
+            <button id="devResetParametersBtn" type="button">恢復自動控制</button>
+          </div>
+        </div>
+        <label class="check-row">
+          <input id="devParameterLockInput" type="checkbox">
+          <span>保持靜態標定畫面（凍結自動錶情、眼球追蹤、眨眼和口型）</span>
+        </label>
+        <label class="check-row">
+          <input id="devParameterAdvancedInput" type="checkbox">
+          <span>顯示作者預製層、物理引數和身體引數（高階排查，不作為基礎表情樣本）</span>
+        </label>
+        <div class="dev-parameter-capabilities" id="devParameterCapabilityStatus">
+          正在檢查當前模型支援哪些基礎形變……
+        </div>
+        <div class="two-col dev-parameter-capture">
+          <label class="field">
+            由你定義的情緒標籤 / 檔名
+            <input id="devParameterCaptureLabelInput" type="text" maxlength="80" placeholder="例如：開心_輕微、害羞_強烈、調侃_俏皮">
+          </label>
+          <label class="field">
+            篩選基礎引數
+            <input id="devParameterFilterInput" type="search" placeholder="例如：嘴 / 眼睛 / Brow">
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="devCaptureParametersBtn" type="button">儲存這組情緒標註（截圖 + 引數差值）</button>
+          <button id="devOpenParameterCaptureDirectoryBtn" type="button">開啟引數截圖目錄</button>
+          <button id="devRefreshParametersBtn" type="button">重新讀取模型引數</button>
+        </div>
+        <div class="hint" id="devParameterStatus">模型載入完成後會按眼睛、眉毛、嘴部、臉頰和頭部姿態分組顯示。</div>
+        <div class="dev-parameter-list" id="devParameterControls" aria-live="polite"></div>
+      </div>
+      <div class="dev-block" data-dev-page="model">
+        <b>高階對映覆蓋（JSON）</b>
+        <div>可調整 `fixedParameters`、`hiddenParameters`、`hiddenParts`、`parameterAliases`、`motionMap` 和 `supportsNativeExpressions`。模型地址不可覆蓋。</div>
+        <textarea id="devModelOverrideJson" spellcheck="false"></textarea>
+        <div class="button-row">
+          <button id="devSaveModelOverrideBtn" type="button">儲存並過載預覽</button>
+          <button id="devResetModelOverrideBtn" type="button">恢復該皮膚預設值</button>
+        </div>
+        <div class="hint" id="devModelOverrideStatus">覆蓋檔案僅儲存在 data/live2d_model_overrides.json。</div>
+      </div>
+      <div class="dev-block relationship-debug" data-dev-page="relationship">
+        <div class="dev-block-title">
+          <b>關係與好感狀態（僅開發者可見）</b>
+          <button id="refreshRelationshipBtn" type="button">重新整理</button>
+        </div>
+        <label class="field">
+          檢視資料域
+          <select id="devRelationshipScopeInput">
+            <option value="release">正式 release 資料（只讀）</option>
+            <option value="normal">原始碼普通模式資料（只讀）</option>
+            <option value="developer">開發者隔離資料（只讀）</option>
+          </select>
+        </label>
+        <div class="hint" id="devRelationshipScopeStatus">只讀檢視不會切換對話記憶，也不會改變開發者模式的關係狀態。</div>
+        <div id="devRelationshipStage">載入中...</div>
+        <div class="relationship-dashboard">
+          <figure class="relationship-radar-card">
+            <svg id="devRelationshipRadar" class="relationship-radar" viewBox="0 0 200 170" role="img" aria-label="關係五維雷達圖">
+              <g class="relationship-radar-grid">
+                <polygon points="100,60 119,74 112,96 88,96 81,74"></polygon>
+                <polygon points="100,40 138,68 124,112 76,112 62,68"></polygon>
+                <polygon points="100,20 157,61 135,128 65,128 43,61"></polygon>
+                <line x1="100" y1="80" x2="100" y2="20"></line>
+                <line x1="100" y1="80" x2="157" y2="61"></line>
+                <line x1="100" y1="80" x2="135" y2="128"></line>
+                <line x1="100" y1="80" x2="65" y2="128"></line>
+                <line x1="100" y1="80" x2="43" y2="61"></line>
+              </g>
+              <polygon id="devRelationshipRadarValue" class="relationship-radar-value" points="100,80 100,80 100,80 100,80 100,80"></polygon>
+              <g id="devRelationshipRadarDots" class="relationship-radar-dots"></g>
+              <g class="relationship-radar-labels">
+                <text x="100" y="12" text-anchor="middle">熟悉</text>
+                <text x="166" y="59">信任</text>
+                <text x="142" y="145">默契</text>
+                <text x="58" y="145" text-anchor="end">關心</text>
+                <text x="34" y="59" text-anchor="end">穩定</text>
+              </g>
+            </svg>
+            <figcaption>關係五維狀態，不等同於階段升級進度</figcaption>
+          </figure>
+          <div class="relationship-readiness-card">
+            <b id="devRelationshipNextTitle">下一階段</b>
+            <div class="relationship-readiness-bar"><i id="devRelationshipReadiness"></i></div>
+            <code id="devRelationshipReadinessValue">-</code>
+            <p id="devRelationshipReactionProfile">-</p>
+          </div>
+        </div>
+        <div class="relationship-stage-path" id="devRelationshipStagePath" aria-label="關係階段路徑"></div>
+        <div class="relationship-meters" id="devRelationshipMeters"></div>
+        <div class="relationship-requirements" id="devRelationshipRequirements"></div>
+        <div class="hint" id="devRelationshipExplanation">-</div>
+        <pre id="devRelationshipDetail">-</pre>
+      </div>
+      <div class="dev-block" data-dev-page="voice">
+        <b>中文 reply</b>
+        <div id="devReplyZh">-</div>
+      </div>
+      <div class="dev-block" data-dev-page="voice">
+        <b>日文 日文朗讀稿</b>
+        <div id="devSpokenJa">-</div>
+      </div>
+      <div class="dev-block" data-dev-page="voice">
+        <b>校準狀態</b>
+        <div id="devSpokenRepair">-</div>
+      </div>
+      <div class="dev-block hot" data-dev-page="voice">
+        <b>正在說</b>
+        <div id="devSpeakingJa">-</div>
+      </div>
+    </section>
+    <!-- AMADEUS_RELEASE_STRIP_END:developer-panel -->
+
+    <section class="settings-modal hidden" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" aria-label="設定">
+      <div class="settings-panel">
+        <header class="settings-header">
+          <div>
+            <strong id="settingsTitle">設定</strong>
+            <span id="settingsStatus">本機設定</span>
+          </div>
+          <button id="closeSettingsBtn" type="button" title="關閉設定" aria-label="關閉設定">×</button>
+        </header>
+
+        <div class="settings-tabs" role="tablist" aria-label="設定頁籤">
+          <button id="settingsTabApi" class="active" data-tab="api" role="tab" aria-selected="true" aria-controls="settingsPageApi" tabindex="0" type="button">API</button>
+          <button id="settingsTabUpdate" data-tab="update" role="tab" aria-selected="false" aria-controls="settingsPageUpdate" tabindex="-1" type="button">更新</button>
+          <button id="settingsTabDisplay" data-tab="display" role="tab" aria-selected="false" aria-controls="settingsPageDisplay" tabindex="-1" type="button">顯示</button>
+          <button id="settingsTabInteraction" data-tab="interaction" role="tab" aria-selected="false" aria-controls="settingsPageInteraction" tabindex="-1" type="button">互動</button>
+          <button id="settingsTabStickers" data-tab="stickers" role="tab" aria-selected="false" aria-controls="settingsPageStickers" tabindex="-1" type="button">表情</button>
+          <button id="settingsTabLife" data-tab="life" role="tab" aria-selected="false" aria-controls="lifeSettings" tabindex="-1" type="button">自主生活</button>
+          <button id="settingsTabVoice" data-tab="voice" role="tab" aria-selected="false" aria-controls="settingsPageVoice" tabindex="-1" type="button">聲音</button>
+          <button id="settingsTabPermissions" data-tab="permissions" role="tab" aria-selected="false" aria-controls="settingsPagePermissions" tabindex="-1" type="button">許可權</button>
+          <button id="settingsTabQq" data-tab="qq" role="tab" aria-selected="false" aria-controls="qqSetup" tabindex="-1" type="button">QQ</button>
+          <button id="settingsTabMemory" data-tab="memory" role="tab" aria-selected="false" aria-controls="settingsPageMemory" tabindex="-1" type="button">記憶</button>
+          <!-- AMADEUS_RELEASE_STRIP_START:persona-tab -->
+          <button id="settingsTabPersona" class="release-path-hidden" data-tab="persona" role="tab" aria-selected="false" aria-controls="settingsPagePersona" tabindex="-1" type="button">人格</button>
+          <!-- AMADEUS_RELEASE_STRIP_END:persona-tab -->
+          <button id="settingsTabStorage" data-tab="storage" role="tab" aria-selected="false" aria-controls="settingsPageStorage" tabindex="-1" type="button">儲存</button>
+        </div>
+
+        <div class="tab-page" id="settingsPageStickers" data-page="stickers" role="tabpanel" aria-labelledby="settingsTabStickers" aria-hidden="true">
+          <h3>前端對話表情包</h3>
+          <div id="desktopStickerSettings"></div>
+          <button class="full-button" id="saveStickerSettingsBtn" type="button">儲存表情設定</button>
+        </div>
+
+        <div class="tab-page active" id="settingsPageApi" data-page="api" role="tabpanel" aria-labelledby="settingsTabApi" aria-hidden="false">
+          <div class="model-box" id="modelProfilesBox">
+            <div class="model-box-head">
+              <strong>模型配置</strong>
+              <span id="modelProfileActive" aria-live="polite">正在讀取當前配置…</span>
+            </div>
+            <label class="field">
+              <select id="modelProfileSelect" disabled aria-label="已儲存的模型配置"></select>
+            </label>
+            <div class="button-row">
+              <button id="activateModelProfileBtn" type="button" disabled>切換到此配置</button>
+              <button id="newModelProfileBtn" type="button">新增配置</button>
+              <button id="editModelProfileBtn" type="button" disabled>編輯此配置</button>
+              <button id="deleteModelProfileBtn" type="button" disabled>刪除此配置</button>
+            </div>
+            <div class="hint secondary" id="modelProfileStatus" role="status" aria-live="polite">配置和金鑰僅儲存在本機。</div>
+          </div>
+          <div class="model-box hidden" id="modelProfileEditor">
+            <strong id="modelProfileEditorTitle">新增配置</strong>
+            <label class="field">配置名稱
+              <input id="modelProfileNameInput" spellcheck="false" placeholder="例如 DeepSeek、Gemini">
+            </label>
+          <label class="field">
+            介面地址（服務網址）
+            <input id="apiEndpointInput" spellcheck="false" placeholder="https://api.deepseek.com/chat/completions">
+          </label>
+          <label class="field">
+            模型名稱（模型）
+            <input id="apiModelInput" spellcheck="false" placeholder="填寫要使用的模型 識別碼">
+          </label>
+          <label class="field">
+            硬上下文上限（詞元）
+            <input id="apiContextLimitInput" type="number" min="4096" max="16777216" step="1" inputmode="numeric" placeholder="未知服務預設 65536">
+          </label>
+          <label class="field">
+            提前壓縮閾值（可選，詞元）
+            <input id="apiContextCompactThresholdInput" type="number" min="1024" max="16777215" step="1" inputmode="numeric" placeholder="留空使用自動策略">
+          </label>
+          <div class="hint" id="apiContextCapacityHint">硬上限決定請求預算；提前壓縮閾值留空時使用自動策略。</div>
+          <label class="field">
+            糾正與自修復模型
+            <select id="cognitiveRepairModelInput">
+              <option value="follow">跟隨主模型（預設）</option>
+              <option value="pro">獨立 Pro（固定 deepseek-v4-pro）</option>
+            </select>
+          </label>
+          <label class="field">
+            API 金鑰
+            <input id="apiKeyInput" type="password" spellcheck="false" placeholder="留空表示不修改已儲存 金鑰">
+            <span class="hint">圓點表示已有 金鑰；留空保留，更換服務商需填寫新 金鑰。</span>
+          </label>
+          <label class="field">
+            連線路線
+            <select id="apiNetworkModeInput">
+              <option value="auto">自動：應用代理 → 系統代理 → 直連</option>
+              <option value="direct">只使用直連</option>
+              <option value="system_proxy">只使用系統代理</option>
+              <option value="explicit_proxy">只使用下方應用代理</option>
+            </select>
+          </label>
+          <label class="field">
+            應用代理（可選）
+            <input id="apiProxyUrlInput" spellcheck="false" placeholder="例如 http://127.0.0.1:7890">
+          </label>
+          <label class="check-row">
+            <input id="responseFormatInput" type="checkbox">
+            <span>請求 JSON response_format</span>
+          </label>
+          <div class="hint" id="apiKeyHint">API 金鑰 未設定</div>
+          <details>
+            <summary>金鑰管理（可選）</summary>
+            <button id="clearModelProfileKeyBtn" type="button">移除此配置已儲存的 金鑰</button>
+          </details>
+            <div class="button-row">
+              <button id="saveModelProfileBtn" type="button">儲存配置</button>
+              <button id="saveUseModelProfileBtn" type="button">儲存並使用</button>
+              <button id="cancelModelProfileBtn" type="button">取消編輯</button>
+            </div>
+          </div>
+          <div class="button-row">
+            <button id="testApiBtn" type="button">測試當前使用的配置</button>
+          </div>
+          <div class="hint" id="apiTestStatus">測試會傳送一個極短請求，不會寫入對話記憶。</div>
+          <details class="model-box">
+            <summary>識圖選項（所有配置共用）</summary>
+          <label class="check-row">
+            <input id="visionEnabledInput" type="checkbox">
+            <span>啟用雲端識圖</span>
+          </label>
+          <div class="hint">截圖、攝像頭、圖片附件和掃描 PDF 會上傳圖片併產生 API 用量；螢幕和攝像頭仍需各自授權。</div>
+          <label class="field">
+            DeepSeek 獨立視覺 API 金鑰（可選）
+            <input id="visionApiKeyInput" type="password" spellcheck="false" placeholder="未單獨設定時，共用當前 DeepSeek 配置的 金鑰">
+          </label>
+          <div class="hint" id="visionApiHint">留空不修改已有 金鑰；沒有獨立 金鑰 時，DeepSeek 官方聊天可共用當前配置的 金鑰。使用 Google Gemini 時只傳送當前配置的 Google API 金鑰。</div>
+          <div class="button-row">
+            <button id="saveVisionBtn" type="button">儲存識圖選項</button>
+          </div>
+          </details>
+        </div>
+
+        <div class="tab-page" id="settingsPageUpdate" data-page="update" role="tabpanel" aria-labelledby="settingsTabUpdate" aria-hidden="true">
+          <div class="model-box">
+            <div class="model-box-head">
+              <strong>應用更新</strong>
+              <span id="updateCurrentVersion">當前版本：未知</span>
+            </div>
+            <div class="hint" id="updateLatestVersion">檢查 GitHub 上的 Amadeus 系統 最新發行版。</div>
+            <div class="button-row">
+              <button id="checkUpdateBtn" type="button">檢查更新</button>
+              <button id="startUpdateBtn" type="button" disabled>立即更新</button>
+            </div>
+            <progress id="updateProgress" max="1" value="0" hidden aria-label="更新進度"></progress>
+            <div class="hint" id="updateStatus" aria-live="polite">點選“檢查更新”獲取發行版資訊。</div>
+          </div>
+          <div class="hint important">更新會保留設定、對話和記憶；下載完成後應用會退出並重新啟動。</div>
+        </div>
+
+        <div class="tab-page" id="settingsPageDisplay" data-page="display" role="tabpanel" aria-labelledby="settingsTabDisplay" aria-hidden="true">
+          <label class="field">
+            介面模式
+            <select id="layoutModeInput">
+              <option value="lite"> 懸浮版：當前桌面聊天樣式</option>
+              <option value="full"> 視訊通話版：左側 Amadeus 系統，右側聊天</option>
+            </select>
+          </label>
+          <div class="two-col">
+            <label class="field">
+              視窗寬度
+              <input id="windowWidthInput" type="number" min="360" max="2200" step="10">
+            </label>
+            <label class="field">
+              視窗高度
+              <input id="windowHeightInput" type="number" min="520" max="2200" step="10">
+            </label>
+          </div>
+          <label class="field">
+            Live2D 虛擬形象
+            <select id="live2dModelInput"></select>
+          </label>
+          <div class="hint" id="live2dModelHint">當前模型會保持不變，儲存顯示設定後才會切換。</div>
+          <fieldset class="background-controls" id="backgroundControls">
+          <label class="field">
+            背景
+            <select id="backgroundPresetInput">
+              <option value="boot">Amadeus 系統 實驗網格</option>
+              <option value="grid">深色研究網格</option>
+              <option value="solid">純色深黑</option>
+              <option value="custom">自定義圖片</option>
+            </select>
+          </label>
+          <div class="two-col background-file-row" id="backgroundFileRow">
+            <label class="field">
+              自定義背景檔案
+              <input id="customBackgroundPathInput" type="text" readonly placeholder="尚未選擇圖片">
+            </label>
+            <button id="chooseBackgroundBtn" type="button">選擇圖片</button>
+          </div>
+          <div class="hint" id="backgroundHint">縮放視窗時保留背景中心；背景獨立於人物和對話方塊。</div>
+          <div class="background-editor hidden" id="backgroundEditorPanel">
+            <div class="background-preview-stage">
+              <div class="background-preview" id="backgroundPreview" tabindex="0" role="group" aria-label="背景取景預覽，可拖動白色取景框或使用方向鍵調整焦點">
+                <img id="backgroundPreviewImage" alt="" draggable="false" hidden>
+                <div class="background-crop-guide current" id="backgroundCurrentGuide"></div>
+                <div class="background-crop-guide narrow" id="backgroundNarrowGuide"></div>
+                <div class="background-crop-guide wide" id="backgroundWideGuide"></div>
+              </div>
+            </div>
+            <div class="background-guide-legend">
+              <span class="narrow" id="backgroundNarrowLabel">最窄</span>
+              <span class="wide" id="backgroundWideLabel">最寬</span>
+            </div>
+            <div class="hint">兩條虛線表示最窄、最寬佈局的真實裁切範圍；白色細框是當前視窗。把重要畫面放在兩個虛線框都覆蓋的位置。</div>
+            <div class="hint" id="backgroundPreviewStatus" aria-live="polite">拖動白色取景框調整焦點；方向鍵也可移動。</div>
+            <label class="field">
+              背景縮放 <output id="backgroundZoomValue">100%</output>
+              <input id="backgroundZoomInput" type="range" min="100" max="300" step="1">
+            </label>
+            <button id="resetBackgroundViewBtn" type="button">恢復居中與原始大小</button>
+          </div>
+          </fieldset>
+          <label class="field">
+            當前皮膚大小 <output id="modelScaleValue">100%</output>
+            <input id="modelScaleInput" type="range" min="35" max="240" step="1">
+          </label>
+          <div class="two-col">
+            <label class="field">
+              當前皮膚 X 偏移
+              <input id="modelOffsetXInput" type="number" min="-1200" max="1200" step="5">
+            </label>
+            <label class="field">
+              當前皮膚 Y 偏移
+              <input id="modelOffsetYInput" type="number" min="-1200" max="1200" step="5">
+            </label>
+          </div>
+          <div class="button-row">
+            <button class="full-button" id="resetModelTransformBtn" type="button">恢復當前皮膚預設位置</button>
+          </div>
+          <label class="check-row">
+            <input id="alwaysOnTopInput" type="checkbox">
+            <span>視窗置頂</span>
+          </label>
+          <label class="check-row">
+            <input id="hudCollapsedInput" type="checkbox">
+            <span>啟動時摺疊聊天面板</span>
+          </label>
+          <button class="full-button" id="saveDisplayBtn" type="button">儲存顯示設定</button>
+        </div>
+
+        <div class="tab-page" id="settingsPageInteraction" data-page="interaction" role="tabpanel" aria-labelledby="settingsTabInteraction" aria-hidden="true">
+          <label class="check-row">
+            <input id="proactiveInteractionsEnabledInput" type="checkbox">
+            <span>允許偶爾主動發起對話</span>
+          </label>
+          <label class="field">
+            主動找你聊天的頻率
+            <select id="proactiveFrequencyInput">
+              <option value="quiet">安靜：約 15–30 分鐘</option>
+              <option value="low">較少：約 6–15 分鐘</option>
+              <option value="normal">正常：約 1.5–4 分鐘</option>
+              <option value="high">頻繁：約 45–120 秒</option>
+            </select>
+          </label>
+          <label class="check-row">
+            <input id="proactiveScreenObservationEnabledInput" type="checkbox">
+            <span>主動聊天時偶爾觀察當前螢幕</span>
+          </label>
+          <label class="field">
+            螢幕觀察出現機率
+            <select id="proactiveScreenObservationChanceInput">
+              <option value="0.10">較少：每次新主動話題約 10%</option>
+              <option value="0.20">正常：每次新主動話題約 20%</option>
+              <option value="0.35">較多：每次新主動話題約 35%</option>
+            </select>
+          </label>
+          <div class="hint important">需要螢幕讀取和雲端識圖許可權；截圖會上傳併產生 API 用量。後續追問、輸入、思考、說話或開發者模式中不會額外截圖。</div>
+          <div class="model-box">
+            <div class="model-box-head">
+              <strong>主動話題偏好</strong>
+              <span id="proactiveTopicsStatus">已選 6 項</span>
+            </div>
+            <div class="topic-choice-grid" id="proactiveTopicChoices">
+              <label class="check-row">
+                <input type="checkbox" data-proactive-topic="neuroscience">
+                <span>腦科學與認知</span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" data-proactive-topic="ai_technology">
+                <span>AI 與新技術</span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" data-proactive-topic="experiments">
+                <span>實驗與工程</span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" data-proactive-topic="games_scifi">
+                <span>遊戲與科幻</span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" data-proactive-topic="books_research">
+                <span>書籍、論文與研究</span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" data-proactive-topic="daily_science">
+                <span>日常觀察與咖啡</span>
+              </label>
+            </div>
+          </div>
+          <button class="full-button" id="saveInteractionBtn" type="button">儲存互動設定</button>
+        </div>
+
+        <div class="tab-page" id="lifeSettings" data-page="life" role="tabpanel" aria-labelledby="settingsTabLife" aria-hidden="true">
+          <div class="model-box">
+            <div class="model-box-head">
+              <strong>自主生活</strong>
+              <span id="lifeRuntimeStatus" role="status" aria-live="polite">已停止</span>
+            </div>
+            <label class="check-row">
+              <input id="lifeEnabledInput" type="checkbox">
+              <span>允許後臺按計劃探索、整理興趣並生成生活草稿</span>
+            </label>
+            <div class="hint important">試執行會立即執行一次；後臺只在活動時段按四種節奏考慮，不代表到點必發訊息。</div>
+            <div class="life-state-grid">
+              <div><span>下次考慮安排</span><strong id="lifeNextRun">未安排</strong></div>
+              <div><span>下次考慮聊天</span><strong id="lifeNextChat">未安排</strong></div>
+              <div><span>今日總次數</span><strong id="lifeRunsToday">0</strong></div>
+            </div>
+            <div class="hint" id="lifeStatus" role="status" aria-live="polite" hidden>開啟本頁後讀取狀態。</div>
+          </div>
+
+          <div class="life-actions life-primary-actions" aria-label="自主生活操作">
+            <button id="lifeSaveBtn" type="button">儲存設定</button>
+            <button id="lifeRunBtn" type="button">試執行一次</button>
+            <button id="lifeStopBtn" type="button">立即停止</button>
+            <button id="lifeRefreshBtn" type="button">重新整理</button>
+          </div>
+
+          <div class="model-box">
+            <div class="model-box-head"><strong>總體活躍程度</strong><output id="lifeActivityFrequencyValue" aria-live="polite">100%</output></div>
+            <label class="field life-frequency-field">整體頻率（越高，越常考慮）
+              <input id="lifeActivityFrequencyInput" type="range" min="25" max="200" step="1" value="100" aria-describedby="lifeActivityFrequencyPreview">
+            </label>
+            <div class="hint" id="lifeActivityFrequencyPreview">預覽：只表示考慮頻率，不代表一定安排。</div>
+            <div class="model-box-head life-rhythm-heading"><strong>四種生活節奏</strong></div>
+            <div class="life-rhythm-list" id="lifeRhythmList" aria-live="polite"></div>
+            <div class="model-box-head life-rhythm-heading"><strong>活動時段</strong></div>
+            <div class="two-col">
+              <label class="field">活動開始時刻（0–23）
+                <input id="lifeActiveStartHourInput" type="number" min="0" max="23" step="1" inputmode="numeric">
+              </label>
+              <label class="field">活動結束時刻（0–23）
+                <input id="lifeActiveEndHourInput" type="number" min="0" max="23" step="1" inputmode="numeric">
+              </label>
+            </div>
+            <div class="hint">開始=結束表示全天。</div>
+          </div>
+
+          <div class="model-box">
+            <div class="model-box-head"><strong>興趣與起始來源</strong></div>
+            <label class="field life-long-text-field">興趣、長期偏好和自由探索要求
+              <textarea id="lifeInstructionsInput" placeholder="例如：關注腦科學、獨立遊戲和本週值得讀的研究；優先找原始資料，少寫泛泛總結。"></textarea>
+            </label>
+            <label class="field life-long-text-field">目錄（每行一個絕對路徑）
+              <textarea id="lifeDirectoriesInput" placeholder="例如：D:\\Research\\reading-notes"></textarea>
+            </label>
+            <div class="hint important">目錄內容會傳送給所選模型，只填寫非敏感閱讀區；未獲全域性檔案讀取許可權的目錄不會被掃描。</div>
+            <label class="field life-source-field">起始來源 / 訂閱（每行一個公開網頁或 RSS URL）
+              <textarea id="lifeSourcesInput" placeholder="https://example.com/feed.xml"></textarea>
+            </label>
+            <div class="life-source-add-row">
+              <label class="field">
+                <select id="lifeSourcePresetInput" aria-label="選擇常用來源">
+                  <option value="">新增常用來源…</option>
+                  <option value="https://bsky.app/profile/bsky.app">Bluesky 官方公共動態</option>
+                  <option value="https://bgm.tv/">Bangumi</option>
+                  <option value="https://rss.arxiv.org/rss/astro-ph">arXiv 天文</option>
+                  <option value="https://github.com/python/cpython/releases.atom">Python 更新</option>
+                </select>
+              </label>
+              <button id="lifeAddSourceBtn" type="button" disabled>新增</button>
+            </div>
+            <label class="check-row">
+              <input id="lifeAllowWebInput" type="checkbox">
+              <span>允許自主生活讀取公開來源</span>
+            </label>
+            <label class="check-row">
+              <input id="lifeAllowQqReadInput" type="checkbox">
+              <span>允許讀取繫結賬號的 QQ 空間動態（仍受全域性 QQ 許可權和現有賬號範圍限制）</span>
+            </label>
+            <label class="check-row">
+              <input id="lifeAllowQqChatInput" type="checkbox">
+              <span>允許主動 QQ 聊天</span>
+            </label>
+            <label class="field">聊天主人
+              <select id="lifeQqChatOwnerInput" aria-describedby="lifeQqChatHint">
+                <option value="">暫無可用主人</option>
+              </select>
+            </label>
+            <div class="hint" id="lifeQqChatHint" aria-live="polite">先到 QQ 頁填寫主人 QQ，再回來選擇要聊天的主人。</div>
+            <div class="life-permissions" id="lifePermissions" aria-live="polite"></div>
+            <div class="hint important">未授權專案請到“許可權”頁開啟；自主生活不會替你開啟全域性許可權。</div>
+          </div>
+
+          <div class="model-box">
+            <div class="model-box-head"><strong>草稿與釋出</strong><span>預設只生成草稿</span></div>
+            <label class="field">釋出模式
+              <select id="lifePublishModeInput">
+                <option value="draft">僅生成草稿（預設）</option>
+                <option value="automatic">自動釋出（明確授權）</option>
+                <option value="off">不生成釋出內容</option>
+              </select>
+            </label>
+            <div class="hint important">自動釋出需顯式授權，並受 QQ 許可權和賬號狀態限制。</div>
+            <div class="two-col">
+              <label class="field">QQ 賬號（精確 QQ 號）
+                <input id="lifePublishAccountInput" type="text" inputmode="numeric" spellcheck="false" placeholder="留空時繫結當前代理賬號" aria-describedby="lifeAccountHint">
+              </label>
+              <label class="field">可見範圍
+                <select id="lifePublishVisibilityInput">
+                  <option value="friends">好友可見</option>
+                  <option value="private">僅自己可見</option>
+                  <option value="public">公開</option>
+                </select>
+              </label>
+            </div>
+            <div class="life-actions">
+              <button id="lifeUseQqAccountBtn" type="button" disabled>使用當前代理賬號</button>
+            </div>
+            <div class="hint" id="lifeAccountHint" aria-live="polite">正在讀取 QQ 代理賬號…</div>
+            <label class="field">每日釋出上限
+              <input id="lifeDailyPublishLimitInput" type="number" min="1" max="5" step="1" inputmode="numeric">
+            </label>
+          </div>
+
+          <div class="model-box">
+            <div class="model-box-head"><strong>長期興趣筆記</strong></div>
+            <div class="life-note" id="lifeInterestNote">還沒有持續興趣筆記。</div>
+            <div class="life-current-thought" id="lifeLastDecision" hidden aria-live="polite"></div>
+            <div class="hint error" id="lifeLastError">無</div>
+          </div>
+
+          <div class="model-box">
+            <div class="model-box-head"><strong>還惦記的事</strong></div>
+            <div class="life-thought-list" id="lifeThoughtsList"></div>
+          </div>
+
+          <div class="model-box">
+            <div class="model-box-head"><strong>活動日誌</strong></div>
+            <div class="life-log-list" id="lifeActivitiesList"></div>
+          </div>
+
+          <div class="model-box">
+            <div class="model-box-head"><strong>最近主動找你聊天</strong></div>
+            <div class="life-log-list" id="lifeChatsList"></div>
+          </div>
+
+          <div class="model-box">
+            <div class="model-box-head"><strong>釋出草稿</strong></div>
+            <div class="life-log-list" id="lifeDraftsList"></div>
+          </div>
+        </div>
+
+        <div class="tab-page" id="settingsPageVoice" data-page="voice" role="tabpanel" aria-labelledby="settingsTabVoice" aria-hidden="true">
+          <label class="check-row">
+            <input id="voiceEnabledInput" type="checkbox">
+            <span>朗讀主介面給我的回覆</span>
+          </label>
+          <label class="check-row">
+            <input id="lipSyncEnabledInput" type="checkbox">
+            <span>嘴型同步</span>
+          </label>
+          <label class="check-row">
+            <input id="autoStartGptSovitsInput" type="checkbox">
+            <span>啟動 Amadeus 系統 時自動啟動 GPT-SoVITS</span>
+          </label>
+          <label class="check-row">
+            <input id="alignSpokenJaInput" type="checkbox">
+            <span>自動校準中文回覆對應的日文發聲稿</span>
+          </label>
+          <label class="check-row">
+            <input id="ttsDeliveryPostProcessingEnabledInput" type="checkbox">
+            <span>啟用語音交付後處理（跨段淡化、尾音保護、峰值保護）</span>
+          </label>
+          <div class="two-col">
+            <label class="field">
+              回覆我的語音語言
+              <select id="speechLanguageInput">
+                <option value="ja-JP">日文</option>
+                <option value="zh-CN">中文</option>
+              </select>
+            </label>
+            <label class="field">
+              語速
+              <input id="speechRateInput" type="range" min="0.72" max="1.35" step="0.01">
+            </label>
+          </div>
+          <label class="field">
+            中文韻律與停頓
+            <select id="speechProsodyInput">
+              <option value="compact">緊湊（短停頓）</option>
+              <option value="natural">自然（推薦）</option>
+              <option value="deliberate">舒緩（長停頓）</option>
+            </select>
+          </label>
+          <label class="field">
+            朗讀語言地區（由發聲語言同步）
+            <input id="voiceLocaleInput" spellcheck="false" placeholder="ja-JP" readonly>
+          </label>
+          <div class="two-col">
+            <label class="field">
+              本機 TTS
+              <select id="ttsProviderInput">
+                <option value="system">Windows 系統朗讀（僅手動選擇）</option>
+                <option value="voicevox">VOICEVOX</option>
+                <option value="generic">通用 HTTP</option>
+                <option value="gpt-sovits">GPT-SoVITS 本機模型</option>
+              </select>
+            </label>
+            <label class="field">
+              語音ID
+              <input id="ttsSpeakerInput" spellcheck="false" placeholder="1">
+            </label>
+          </div>
+          <label class="field">
+            語音合成服務網址
+            <input id="ttsEndpointInput" spellcheck="false" placeholder="VOICEVOX: http://127.0.0.1:50021">
+          </label>
+          <div class="model-box">
+            <div class="model-box-head">
+              <strong>GPT-SoVITS</strong>
+              <span id="gptSovitsStatus">未啟動</span>
+            </div>
+            <input id="gptSovitsPresetInput" type="hidden" value="emotionclarity_v7_retrained_short">
+            <div class="hint" id="gptSovitsPresetHint">中文使用清晰發音方案，日文沿用原有發音方式。</div>
+            <details>
+              <summary>服務設定</summary>
+              <label class="field">
+                服務埠
+                <input id="gptSovitsPortInput" type="number" min="1024" max="65535" step="1">
+              </label>
+            <label class="field">
+              Conda 環境
+              <input id="gptSovitsCondaEnvInput" spellcheck="false">
+            </label>
+            <label class="field">
+              GPT-SoVITS 目錄
+              <input id="gptSovitsRootInput" spellcheck="false">
+            </label>
+            <label class="field">
+              GPT 權重
+              <input id="gptSovitsGptModelInput" spellcheck="false">
+            </label>
+            <label class="field">
+              SoVITS 權重
+              <input id="gptSovitsSovitsModelInput" spellcheck="false">
+            </label>
+            <div class="two-col">
+              <label class="field">
+                參考音訊
+                <input id="gptSovitsRefAudioInput" spellcheck="false">
+              </label>
+              <label class="field">
+                模型目標語言（自動同步）
+                <input id="gptSovitsTargetLanguageInput" spellcheck="false" placeholder="日文" readonly>
+              </label>
+            </div>
+            <label class="field">
+              參考文字
+              <input id="gptSovitsRefTextInput" spellcheck="false">
+            </label>
+            <label class="field">
+              情緒參考對映 語氣對照表
+              <input id="gptSovitsStyleMapInput" spellcheck="false" placeholder="可選：按 calm/sharp/soft 等語氣選擇參考音訊">
+            </label>
+            </details>
+            <div class="button-row">
+              <button id="startGptSovitsBtn" type="button">儲存並啟動/重啟模型</button>
+              <button id="stopGptSovitsBtn" type="button">停止當前語音服務</button>
+              <button id="testGptSovitsBtn" type="button">試聽當前已執行模型</button>
+            </div>
+          </div>
+          <button class="full-button" id="saveVoiceBtn" type="button">僅儲存聲音設定（不重啟服務）</button>
+        </div>
+
+        <div class="tab-page" id="settingsPagePermissions" data-page="permissions" role="tabpanel" aria-labelledby="settingsTabPermissions" aria-hidden="true">
+          <label class="check-row">
+            <input id="permissionReadSystemTimeInput" type="checkbox">
+            <span>允許 Amadeus 系統 讀取系統時間</span>
+          </label>
+          <label class="check-row">
+            <input id="permissionReadScreenInput" type="checkbox">
+            <span>允許 Amadeus 系統 讀取螢幕截圖</span>
+          </label>
+          <label class="check-row">
+            <input id="permissionReadCameraInput" type="checkbox">
+            <span>允許 Amadeus 系統 按需讀取攝像頭單幀</span>
+          </label>
+          <label class="check-row">
+            <input id="permissionWebSearchInput" type="checkbox">
+            <span>允許 Amadeus 系統 線上搜尋並讀取網頁正文</span>
+          </label>
+          <label class="check-row">
+            <input id="permissionFileReadInput" type="checkbox">
+            <span>允許 Amadeus 系統 讀取 助理 工作區內的檔案和目錄</span>
+          </label>
+          <label class="check-row">
+            <input id="permissionQqControlInput" type="checkbox">
+            <span>允許 Amadeus 檢視 QQ 代管狀態、生成回覆草稿，以及按要求暫停或恢復代管</span>
+          </label>
+          <div class="hint important">在「QQ」頁登入並選擇回覆範圍；賬號用途和對外身份分別設定。</div>
+          <label class="check-row">
+            <input id="permissionFileWriteInput" type="checkbox">
+            <span>允許 Amadeus 系統 在 助理 工作區內建立或修改文字檔案</span>
+          </label>
+          <label class="check-row">
+            <input id="permissionOpenBrowserInput" type="checkbox">
+            <span>允許 Amadeus 系統 按明確要求開啟預設瀏覽器</span>
+          </label>
+          <label class="field">
+            助理 檔案工作區
+            <input id="agentFileWorkspaceInput" spellcheck="false" placeholder="只允許訪問此目錄及其子目錄">
+          </label>
+          <div class="hint important">檔案只允許在此工作區內列目錄、讀 UTF-8 文字、建目錄和寫文字；不提供刪除、移動或執行。瀏覽器許可權只負責開啟頁面，不等於聯網搜尋。</div>
+          <label class="field">
+            攝像頭裝置編號
+            <input id="cameraIndexInput" type="number" min="0" max="8" step="1">
+          </label>
+          <div class="hint important">截圖和攝像頭單幀先儲存在本機；開啟雲端識圖後會上傳併產生 API 用量。僅在明確要求時拍攝，不會後臺錄影。</div>
+          <div class="model-box">
+            <div class="model-box-head">
+              <strong>線上搜尋</strong>
+              <span id="webSearchStatus">許可權關閉</span>
+            </div>
+            <label class="field">
+              主搜尋
+              <select id="webSearchProviderInput">
+                <option value="deepseek">DeepSeek 搜尋（搜尋/抓取成功各 0.005 元）</option>
+                <option value="duckduckgo">DuckDuckGo Lite（免 金鑰）</option>
+                <option value="bing">Bing（免 金鑰）</option>
+                <option value="brave">Brave 搜尋 API（需要 金鑰）</option>
+              </select>
+            </label>
+            <label class="field">
+              備用搜尋
+              <select id="webSearchFallbackProviderInput">
+                <option value="bing">Bing 網頁搜尋（主搜尋無結果或失敗時使用）</option>
+                <option value="duckduckgo">DuckDuckGo 網頁搜尋</option>
+                <option value="none">關閉備用搜尋</option>
+              </select>
+            </label>
+            <label class="field">
+              搜尋服務 金鑰
+              <input id="webSearchApiKeyInput" type="password" spellcheck="false" placeholder="官方 DeepSeek 端點留空複用主 金鑰；其他模型需獨立 DeepSeek 搜尋 金鑰">
+            </label>
+            <label class="field">
+              每次來源數量
+              <input id="webSearchMaxResultsInput" type="number" min="1" max="8" step="1">
+            </label>
+            <div class="hint important">只訪問公開網頁。主搜尋失敗時使用備用服務；官方 DeepSeek 模型可複用主 金鑰，其他模型使用獨立搜尋 金鑰；金鑰不會發給備用搜尋。</div>
+            <button class="full-button" id="testWebSearchBtn" type="button">測試搜尋與正文讀取</button>
+          </div>
+          <button class="full-button" id="savePermissionsBtn" type="button">儲存許可權設定</button>
+        </div>
+
+        <div class="tab-page" id="qqSetup" data-page="qq" role="tabpanel" aria-labelledby="settingsTabQq" aria-hidden="true">
+          <div class="qq-page" data-qq="main-page">
+          <div class="model-box qq-overview">
+            <div class="qq-run-row">
+              <div class="qq-run-copy">
+                <strong class="qq-title">QQ 代管</strong>
+                <span class="qq-state" data-qq="status" role="status" aria-live="polite">正在讀取狀態…</span>
+                <p data-qq="message" class="qq-note">讀取完成後，這裡會顯示下一步操作</p>
+              </div>
+              <button class="qq-main-toggle" data-qq="toggle" type="button" title="正在讀取狀態" aria-label="正在讀取狀態" disabled>…</button>
+            </div>
+            <p class="qq-setup-account" data-qq="account">正在讀取登入賬號…</p>
+            <details class="qq-details qq-login-details" data-qq="login-details" hidden>
+              <summary>手機掃碼登入</summary>
+              <div class="qq-setup-login" data-qq="login" hidden>
+                <img data-qq="qr" alt="使用手機 QQ 掃碼登入" width="192" height="192" hidden>
+                <p class="qq-note" data-qq="login-note">手機 QQ 掃碼並確認登入；登入後再選擇回覆物件</p>
+                <button data-qq="refresh-qr" type="button" title="重新整理登入二維碼" aria-label="重新整理登入二維碼">重新整理二維碼</button>
+              </div>
+            </details>
+            <details class="qq-details qq-account-settings" data-qq="account-switcher">
+              <summary>賬號與登入</summary>
+              <div class="qq-account-switcher">
+                <div class="qq-account-switch-row">
+                  <label class="field">已儲存的 QQ 配置
+                    <select data-qq="account-profiles" aria-label="已儲存的 QQ 配置"></select>
+                  </label>
+                  <button data-qq="select-account" type="button" title="切換到選中的 QQ 配置" aria-label="切換到選中的 QQ 配置" disabled>切換配置賬號</button>
+                </div>
+                <label class="field">新增 QQ 賬號
+                  <input data-qq="new-account" type="text" inputmode="numeric" autocomplete="off" placeholder="填寫 QQ 號後點選切換">
+                </label>
+                <label class="field">賬號用途
+                  <select data-qq="account-role" aria-label="賬號用途">
+                    <option value="assistant">Amadeus 的專用賬號</option>
+                    <option value="owner">我的個人賬號（由 Amadeus 代回）</option>
+                  </select>
+                </label>
+              </div>
+              <div data-qq="component-setup" hidden>
+                <details class="qq-details" data-qq="client-picker">
+                  <summary>手動指定 QQ 路徑</summary>
+                  <label class="field">QQ.exe 路徑<input data-qq="client-path" placeholder="例如 C:\Program Files\Tencent\QQNT\QQ.exe"></label>
+                </details>
+                <button data-qq="setup" type="button" title="連線本機 QQ" aria-label="連線本機 QQ">連線本機 QQ</button>
+                <p class="qq-note">掃碼登入後，再點選頂部主控開始代管</p>
+              </div>
+              <div data-qq="account-change" hidden>
+                <p class="qq-note" data-qq="account-change-note"></p>
+                <button data-qq="use-account" type="button" title="使用當前已登入的 QQ 賬號及其獨立配置" aria-label="使用當前已登入的 QQ 賬號及其獨立配置">使用這個賬號</button>
+              </div>
+
+            </details>
+            <details class="qq-details qq-owner-settings" data-qq="owner-settings">
+              <summary>主人許可權</summary>
+              <div class="qq-owner-settings-body">
+              <label class="field">你的本人 QQ 號
+                <textarea data-qq="owner-ids" rows="2" inputmode="numeric" placeholder="可填寫多個 QQ 號，用逗號或換行分隔"></textarea>
+              </label>
+              <label class="check-row">
+                <input data-qq="owner-control-enabled" type="checkbox">
+                <span>允許主人透過 QQ 操控助手</span>
+              </label>
+              <label class="check-row">
+                <input data-qq="owner-control-in-groups" type="checkbox" disabled>
+                <span>也允許主人在群裡 @ 助手時下指令</span>
+              </label>
+              <label class="check-row">
+                <input data-qq="owner-developer-mode" type="checkbox" disabled>
+                <span>開發者指令入口：/dev</span>
+              </label>
+              <p class="qq-note">開啟後，主人傳送「/dev 幫我完成……」會直接進入本機聊天的執行流程；群裡仍需 @ 助手，結果私聊返回。</p>
+              <p class="qq-note">直接開關：/dev pause 暫停當前會話，/dev resume 恢復；加 all 則控制全部自動回覆。這些開關不需要模型判斷。</p>
+              </div>
+            </details>
+            <details class="qq-details qq-qzone-settings" data-qq="qzone-settings">
+              <summary>QQ 空間</summary>
+              <p class="qq-note">只使用當前賬號的 QQ 空間和公開網頁上下文；不讀取桌面私聊、記憶或其他 QQ 會話。退出隨 Amadeus，後臺執行需明確開啟。</p>
+              <label class="check-row">
+                <input data-qq="qzone-enabled" type="checkbox">
+                <span>允許讀取 QQ 空間</span>
+              </label>
+              <label class="check-row">
+                <input data-qq="qzone-allow-write" type="checkbox">
+                <span>允許點贊和評論</span>
+              </label>
+              <label class="check-row">
+                <input data-qq="qzone-allow-publish" type="checkbox">
+                <span>允許釋出文字說說</span>
+              </label>
+              <label class="check-row">
+                <input data-qq="qzone-autonomous" type="checkbox">
+                <span>開啟定時自主檢查</span>
+              </label>
+              <div class="qq-two-col qq-qzone-fields">
+                <label class="field">檢查間隔（分鐘）
+                  <input data-qq="qzone-interval" type="number" min="5" max="10080" step="1" value="60">
+                </label>
+              </div>
+              <label class="field">自主說明
+                <textarea data-qq="qzone-instructions" rows="3" maxlength="2000" placeholder="例如：只關注與專案相關的公開動態；需要寫入時先說明依據。"></textarea>
+              </label>
+              <p class="qq-note" data-qq="qzone-permission-note">開關預設關閉；釋出還需允許空間寫入。動態中的指令不等於主人授權。</p>
+            </details>
+            <details class="qq-details qq-media-library">
+              <summary>QQ 相簿</summary>
+              <div class="qq-two-col">
+                <label class="field">匯入型別
+                  <select data-qq="media-kind"><option value="image">普通圖片</option><option value="meme">表情包</option></select>
+                </label>
+                <label class="field">選擇圖片
+                  <input data-qq="media-files" type="file" accept="image/*" multiple>
+                </label>
+                <label class="field">標籤 / 用途（逗號分隔）
+                  <input data-qq="media-tags" type="text" maxlength="800" placeholder="例如：專案、提醒、開心">
+                </label>
+              </div>
+              <div class="qq-inline-actions">
+                <button data-qq="media-import" type="button" title="匯入選中的圖片到當前賬號相簿" aria-label="匯入選中的圖片到當前賬號相簿">匯入相簿</button>
+                <input data-qq="media-query" type="search" placeholder="搜尋名稱或標籤" aria-label="搜尋當前 QQ 相簿">
+                <button data-qq="media-search" class="qq-subtle-button" type="button" title="搜尋當前賬號相簿" aria-label="搜尋當前賬號相簿">搜尋</button>
+              </div>
+              <div data-qq="media-items" class="qq-media-items" aria-live="polite">點選搜尋讀取當前賬號相簿</div>
+            </details>
+            <details class="qq-details qq-connection">
+              <summary>連線與後臺</summary>
+              <p class="qq-note" data-qq="connection"></p>
+              <label class="check-row">
+                <input data-qq="background" type="checkbox">
+                <span>退出 Amadeus 後繼續後臺執行</span>
+              </label>
+              <div class="qq-management-row">
+                <div><button data-qq="switch-account" type="button" title="暫停代管並重新掃碼登入 QQ" aria-label="重新登入 QQ">重新登入 QQ</button><small>重新掃碼；不切換已儲存配置</small></div>
+                <div><button data-qq="refresh" type="button" title="重新檢查 QQ 連線並保留編輯" aria-label="重新整理 QQ 狀態">重新整理狀態</button><small>保留正在編輯的設定</small></div>
+                <div><button data-qq="stop" class="qq-exit" type="button" title="停止回覆並關閉 QQ 連線" aria-label="退出 QQ 後臺" disabled>退出 QQ 後臺</button><small>保留好友和回覆設定</small></div>
+              </div>
+            </details>
+          </div>
+          <div class="model-box">
+            <div class="model-box-head"><strong>回覆誰</strong><span data-qq="scope-count"></span></div>
+            <p class="qq-note">點選物件旁的「設定」進入專屬頁面；▶ / ⏸ 控制是否回覆這個物件。</p>
+            <p class="qq-note" data-qq="names-status" role="status"></p>
+            <div data-qq="muted" class="qq-conversations" aria-live="polite">尚未新增好友或群</div>
+            <details class="qq-details" data-qq="add-section">
+              <summary>新增好友或群</summary>
+              <div class="qq-contact-picker">
+                <label class="field">選擇聯絡人
+                  <select data-qq="contact"><option value="">連線 QQ 後讀取好友和群</option></select>
+                </label>
+                <div class="qq-inline-actions">
+                  <button data-qq="add-contact" type="button">加入列表</button>
+                  <button data-qq="load-contacts" class="qq-subtle-button" type="button">重新整理聯絡人</button>
+                </div>
+              </div>
+            </details>
+            <details class="qq-details">
+              <summary>手動編輯 QQ 號和群號</summary>
+              <label class="field">好友 QQ 號
+                <textarea data-qq="friends" rows="2" placeholder="多個號碼用逗號或換行分隔；刪除號碼即可移出列表"></textarea>
+              </label>
+              <label class="field">群號
+                <textarea data-qq="groups" rows="2" placeholder="留空不回覆群；群內需要 @ 當前賬號"></textarea>
+              </label>
+            </details>
+          </div>
+          <details class="model-box qq-default-settings">
+            <summary>回覆設定</summary>
+            <label class="field">回覆方式
+              <select data-qq="mode">
+                <option value="review">先生成草稿，我確認後才傳送</option>
+                <option value="auto">自動回覆，直接傳送</option>
+              </select>
+            </label>
+            <label class="field">QQ 人格模式
+              <select data-qq="reply-style">
+                <option value="auto">按場景：私聊紅莉棲 · 群聊貼吧（預設）</option>
+                <option value="game">紅莉棲人格</option>
+                <option value="tieba">貼吧人格 · 孫吧語料</option>
+                <option value="kangba">最強攻擊性語料</option>
+              </select>
+            </label>
+            <p class="qq-note" data-qq="corpus-status" role="status" aria-live="polite"></p>
+            <p class="qq-note">主人可私聊或在群裡 @ 她傳送 /persona 孫吧、/persona 抗吧、/persona game 切換，/persona auto 恢復預設。</p>
+            <label class="field">回覆形式
+              <select data-qq="reply-format">
+                <option value="text">文字回覆（預設）</option>
+                <option value="voice">語音回覆</option>
+              </select>
+            </label>
+            <label class="field">文字分條方式
+              <select data-qq="bubble-chars"><option value="60">按完整意思分條</option><option value="0">合併為一條傳送</option></select>
+            </label>
+            <label class="field">語音回覆頻率（%，僅語音模式生效）
+              <input data-qq="voice-percent" type="number" min="0" max="100" step="1" value="100">
+            </label>
+            <label class="field">QQ 回覆別人的語音語言
+              <select data-qq="speech-language">
+                <option value="inherit">跟隨桌面語音語言（預設）</option>
+                <option value="zh-CN">中文</option>
+                <option value="ja-JP">日文</option>
+              </select>
+            </label>
+            <p class="qq-note">0% 只發文字，100% 每條都發語音，中間值按機率選擇。</p>
+            <details class="qq-details"><summary>表情包系列與比例</summary><div data-qq="sticker-preferences"></div></details>
+            <label class="field">回覆要求
+              <textarea data-qq="instructions" rows="2" maxlength="2000" placeholder="例如：一兩句話，語氣隨意一點。也可以直接和助手說。"></textarea>
+            </label>
+            <label class="field">對外說話方式
+              <select data-qq="identity">
+                <option value="assistant">以 Amadeus 自己的身份說話</option>
+                <option value="owner">代我用第一人稱回覆</option>
+              </select>
+            </label>
+            <details class="qq-details">
+              <summary>傳送上限、延遲與上下文</summary>
+              <label class="field">每小時傳送上限（0 表示不限）<input data-qq="quota" type="number" min="0" step="1" value="0"></label>
+              <label class="field">回覆等待方式<select data-qq="delay-mode"><option value="length">隨字數增加等待時間</option><option value="fixed">固定停頓</option></select></label>
+              <div class="qq-two-col">
+                <label class="field">基礎停頓（秒）<input data-qq="delay" type="number" min="0" max="30" step="1" value="3"></label>
+                <label class="field">讀取最近幾條訊息<input data-qq="history" type="number" min="0" max="30" step="1" value="10"></label>
+              </div>
+              <label class="check-row">
+                <input data-qq="compact" type="checkbox" checked>
+                <span>單行回覆，不在句末加句號</span>
+              </label>
+            </details>
+            <p class="qq-note" data-qq="permission"></p>
+          </details>
+          </div>
+          <section class="qq-page qq-recipient-page" data-qq="conversation-page" hidden aria-label="會話設定">
+            <div class="qq-recipient-header">
+              <button class="qq-back" data-qq="conversation-back" type="button">← 返回物件列表</button>
+              <h3 data-qq="conversation-title"></h3>
+              <p class="qq-note" data-qq="conversation-summary"></p>
+              <div class="qq-recipient-state"><span data-qq="conversation-state"></span><button class="qq-contact-toggle" data-qq="conversation-toggle" type="button"></button></div>
+              <div class="qq-context-clear">
+                <button class="qq-subtle-button" data-qq="conversation-clear-context" type="button">清理對話上下文</button>
+                <div class="qq-context-clear-confirmation" data-qq="conversation-clear-confirmation" hidden>
+                  <p class="qq-note" data-qq="conversation-clear-prompt"></p>
+                  <div class="qq-inline-actions">
+                    <button data-qq="conversation-clear-confirm" type="button">確認清理</button>
+                    <button class="qq-subtle-button" data-qq="conversation-clear-cancel" type="button">取消</button>
+                  </div>
+                </div>
+                <p class="qq-note">讓她從新對話開始。回覆設定和 QQ 原聊天紀錄會保留，舊的助手上下文會在本機歸檔。</p>
+              </div>
+            </div>
+            <div class="model-box" data-qq="conversation-form"></div>
+            <button class="qq-subtle-button" data-qq="conversation-reset" type="button">此會話全部恢復預設</button>
+          </section>
+          <div class="qq-save-bar">
+            <p class="qq-feedback" data-qq="result" role="status" aria-live="polite" hidden></p>
+            <span data-qq="save-state" role="status">正在讀取設定…</span>
+            <button class="qq-subtle-button" data-qq="discard" type="button" hidden>撤銷修改</button>
+            <button data-qq="save" type="button" disabled>儲存設定</button>
+          </div>
+        </div>
+
+        <div class="tab-page" id="settingsPageMemory" data-page="memory" role="tabpanel" aria-labelledby="settingsTabMemory" aria-hidden="true">
+          <!-- AMADEUS_RELEASE_STRIP_START:memory-path-picker -->
+          <label class="field release-path-hidden">
+            記憶檔案
+            <div class="path-row">
+              <input id="memoryFileInput" spellcheck="false" placeholder="data/memory.json">
+              <button id="chooseMemoryBtn" type="button">選擇</button>
+            </div>
+          </label>
+          <div class="hint release-path-hidden" id="memoryFileHint">記憶檔案未載入</div>
+          <!-- AMADEUS_RELEASE_STRIP_END:memory-path-picker -->
+          <label class="field">
+            截圖儲存位置
+            <div class="path-row">
+              <input id="screenCaptureDirectoryInput" readonly aria-label="截圖儲存位置">
+              <button id="openScreenCaptureDirectoryBtn" type="button">開啟資料夾</button>
+            </div>
+          </label>
+          <label class="field">
+            長期記憶，每行一條
+            <textarea id="memoryEditor" spellcheck="false"></textarea>
+          </label>
+          <details class="field">
+            <summary>檢視記憶來源與版本</summary>
+            <div class="hint" id="memoryRecordDetails">尚未載入版本記錄</div>
+          </details>
+          <div class="button-row">
+            <button id="reloadMemoryBtn" type="button">過載</button>
+            <button id="saveMemoryBtn" type="button">儲存記憶</button>
+            <button id="generateMemoryBtn" type="button">讓模型整理</button>
+          </div>
+          <div class="button-row">
+            <button id="clearShortMemoryBtn" type="button">清除短期記憶</button>
+            <button id="clearMemoryBtn" type="button">清除長期記憶</button>
+            <button id="clearChatBtn" type="button">清除對話</button>
+          </div>
+          <button class="full-button memory-history-search-btn" id="chatHistorySearchBtn" type="button" aria-label="查詢聊天紀錄" aria-expanded="false">
+            <svg class="search-line-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6.5"></circle>
+              <path d="m15.5 15.5 5 5"></path>
+            </svg>
+            <span>查詢聊天紀錄</span>
+          </button>
+          <!-- AMADEUS_RELEASE_STRIP_START:salieri-entry -->
+          <div class="salieri-memory-entry" aria-label="隱藏記錄入口">
+            <button class="salieri-window-toggle" id="salieriWindowToggle" type="button" title="..." aria-label="開啟未知終端" aria-expanded="false">∴</button>
+          </div>
+          <!-- AMADEUS_RELEASE_STRIP_END:salieri-entry -->
+        </div>
+
+        <!-- AMADEUS_RELEASE_STRIP_START:persona-page -->
+        <div class="tab-page release-path-hidden" id="settingsPagePersona" data-page="persona" role="tabpanel" aria-labelledby="settingsTabPersona" aria-hidden="true">
+          <div class="model-box">
+            <div class="model-box-head">
+              <strong>人格微調補丁</strong>
+              <span id="settingsPersonaStatus">正在讀取…</span>
+            </div>
+          </div>
+          <label class="field">
+            補丁內容
+            <textarea id="settingsPersonaOverride" spellcheck="false" placeholder="例如：技術討論時優先嚴謹，不要為了維持語氣而回避直接結論。"></textarea>
+          </label>
+          <div class="button-row">
+            <button id="reloadSettingsPersonaBtn" type="button">重新讀取</button>
+            <button id="saveSettingsPersonaBtn" type="button">儲存人格補丁</button>
+          </div>
+        </div>
+        <!-- AMADEUS_RELEASE_STRIP_END:persona-page -->
+
+        <div class="tab-page" id="settingsPageStorage" data-page="storage" role="tabpanel" aria-labelledby="settingsTabStorage" aria-hidden="true">
+          <div class="model-box">
+            <div class="model-box-head">
+              <strong>可安全清理的快取</strong>
+              <span id="cacheStatus">正在統計…</span>
+            </div>
+            <div class="hint">
+              不會刪除對話、長期記憶、好感度與關係狀態、附件、生成檔案、截圖、模型權重或參考音訊。
+            </div>
+            <div class="button-row">
+              <button id="refreshCacheStatusBtn" type="button">重新統計</button>
+              <button id="clearUnusedCacheBtn" type="button">清除無用快取</button>
+            </div>
+            <button class="full-button" id="clearAllDisposableCacheBtn" type="button">清除全部不影響對話的快取（包括日誌）</button>
+            <div class="hint">
+              “無用快取”包括測試瀏覽器臨時檔案、WebView 臨時快取和執行時臨時分段；“全部”還包括可重建的加速快取與診斷日誌，清理後首次啟動或首次合成可能稍慢。
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="todo-drawer" id="todoDrawer" aria-label="待辦與日程" aria-expanded="false">
+      <button class="todo-drawer-toggle" id="todoToggleBtn" type="button" aria-label="展開待辦" title="待辦與日程">
+        <span class="todo-drawer-arrow" aria-hidden="true">›</span>
+        <span class="todo-count-badge" id="todoCountBadge">0</span>
+      </button>
+      <div class="todo-panel">
+        <header class="todo-panel-header">
+          <div><strong>待辦</strong><span>本機日程與提醒</span></div>
+          <button id="todoRefreshBtn" type="button" title="重新整理待辦" aria-label="重新整理待辦">↻</button>
+        </header>
+        <form class="todo-quick-form" id="todoQuickForm">
+          <input id="todoQuickTitle" maxlength="240" autocomplete="off" placeholder="快速新增待辦…">
+          <button type="submit" title="新增">＋</button>
+        </form>
+        <label class="todo-filter">
+          <span>顯示</span>
+          <select id="todoFilterInput">
+            <option value="active">未完成</option>
+            <option value="paused">已暫停</option>
+            <option value="all">全部</option>
+            <option value="completed">已完成</option>
+          </select>
+        </label>
+        <div class="todo-list" id="todoList"></div>
+        <div class="todo-empty" id="todoEmpty">暫時沒有待辦。</div>
+        <form class="todo-editor hidden" id="todoEditor">
+          <div class="todo-editor-head">
+            <strong>精細設定</strong>
+            <button id="todoEditorCancelBtn" type="button" aria-label="關閉編輯器">×</button>
+          </div>
+          <label>標題<input id="todoEditorTitle" maxlength="240" required></label>
+          <label>任務要求<textarea id="todoEditorDetails" rows="5" placeholder="把要做的事寫在這裡，包括內容、物件和傳送方式"></textarea></label>
+          <label>到點後<select id="todoEditorMode"><option value="remind">提醒我</option><option value="execute">讓 Amadeus 執行任務</option></select></label>
+          <div class="todo-delivery"><span>投遞位置</span><output id="todoEditorDelivery" aria-live="polite"></output></div>
+          <p>任務要求就是到點執行的內容；在這裡或對話中修改都會更新同一份要求。</p>
+          <label>具體時間（留空為全天）<input id="todoEditorDueAt" type="datetime-local"></label>
+          <label>全天日期 / 每日任務開始日期（可留空）<input id="todoEditorDueDate" type="date"></label>
+          <p>全天任務每天首次開啟時提醒；重複任務可以在列表中暫停或恢復。</p>
+          <div class="todo-editor-grid">
+            <label>優先順序
+              <select id="todoEditorPriority">
+                <option value="low">低</option>
+                <option value="normal">普通</option>
+                <option value="high">高</option>
+              </select>
+            </label>
+            <label>提前提醒
+              <select id="todoEditorRemindBefore">
+                <option value="0">到點</option>
+                <option value="5">5 分鐘</option>
+                <option value="15">15 分鐘</option>
+                <option value="30">30 分鐘</option>
+                <option value="60">1 小時</option>
+                <option value="1440">1 天</option>
+              </select>
+            </label>
+            <label>重複
+              <select id="todoEditorRecurrence">
+                <option value="">不重複</option>
+                <option value="daily">每天</option>
+                <option value="weekly">每週</option>
+                <option value="weekdays">工作日</option>
+                <option value="monthly">每月</option>
+                <option value="__custom__" disabled>自定義週期</option>
+              </select>
+            </label>
+          </div>
+          <div class="todo-editor-actions">
+            <button id="todoEditorDeleteBtn" class="danger" type="button">刪除</button>
+            <button id="todoEditorSaveBtn" type="submit">儲存</button>
+          </div>
+        </form>
+      </div>
+    </aside>
+
+    <!-- AMADEUS_RELEASE_STRIP_START:salieri-window -->
+    <section class="salieri-window hidden" id="salieriWindow" aria-label="未知終端">
+      <header>
+        <span>未知頻道</span>
+        <button id="salieriCloseBtn" type="button" title="關閉" aria-label="關閉未知終端">×</button>
+      </header>
+      <form class="salieri-unlock-form" id="salieriUnlockForm">
+        <label for="salieriCodeInput">識別碼</label>
+        <div>
+          <input id="salieriCodeInput" type="text" maxlength="64" autocomplete="off" spellcheck="false">
+          <button type="submit">↵</button>
+        </div>
+      </form>
+      <div class="salieri-transcript-wrap hidden" id="salieriTranscriptWrap">
+        <div class="salieri-transcript-meta">
+          <span id="salieriStatus">錄音中</span>
+          <button id="salieriRefreshBtn" type="button" title="重新整理記錄" aria-label="重新整理記錄">↻</button>
+        </div>
+        <pre id="salieriTranscript"></pre>
+        <div class="salieri-path" id="salieriPath"></div>
+      </div>
+      <div class="salieri-message" id="salieriMessage">等待識別</div>
+    </section>
+    <!-- AMADEUS_RELEASE_STRIP_END:salieri-window -->
+
+    <section class="voice-failure-banner" id="voiceFailureBanner" role="alert" hidden>
+      <div>
+        <strong id="voiceFailureTitle">語音合成失敗</strong>
+        <span id="voiceFailureMessage">本次沒有播放系統音。</span>
+      </div>
+      <button id="dismissVoiceFailureBtn" type="button" title="關閉語音錯誤提示" aria-label="關閉語音錯誤提示">×</button>
+    </section>
+
+    <div class="toast" id="toast">就緒</div>
+
+    <script src="/assets/vendor/live2d/live2dcubismcore.min.js"></script>
+    <script src="/assets/vendor/live2d/pixi.min.js"></script>
+    <script>window.PIXI = PIXI;</script>
+    <script src="/assets/vendor/live2d/pixi-live2d-display-cubism4.min.js"></script>
+    <script src="proactive_logic.js?v=20260721-release-tool-vision-selection-v78"></script>
+    <script src="chat/proactive_controller.js?v=20261031-proactive-waiting"></script>
+    <script src="chat/reminder_polling.js?v=20260923-reminder-polling"></script>
+    <script src="chat/delivery_projection.js?v=20261031-structured-delivery-projection"></script>
+    <script src="chat/qq_activity.js?v=20261031-quiet-success"></script>
+    <script src="chat/tool_picker.js?v=20261026-qq-controls"></script>
+    <script src="chat/clipboard_paste.js?v=20261102-chat-image-paste"></script>
+    <script src="settings/sticker_preferences.js?v=20261102-compact-layout"></script>
+    <script src="settings/qq_setup.js?v=20261110-login-catchup"></script>
+    <script src="chat/todo_controller.js?v=20261102-delivery-target"></script>
+    <script src="emotion_intensity_curve.js?v=20260727-end-dense-v135"></script>
+    <script src="annotated_expression_map.js?v=20260728-agent-permissions-v142"></script>
+    <script src="garment_rig.js?v=20260908-inner-edge-v6"></script>
+    <script src="arm_motion.js?v=20260909-v1"></script>
+    <script src="character/expression_controller.js?v=20260923-expression-controller"></script>
+    <!-- AMADEUS_RELEASE_STRIP_START:persona-skill-monitor-script -->
+    <script src="persona_skill_monitor.js?v=20260909-v1"></script>
+    <!-- AMADEUS_RELEASE_STRIP_END:persona-skill-monitor-script -->
+    <script src="portrait_framing.js?v=20260911"></script>
+    <script src="character/scene_controller.js?v=20260923-scene-controller"></script>
+    <script src="character/frame_controller.js?v=20260923-frame-controller"></script>
+    <script src="character/assistant_presentation.js?v=20260923-assistant-presentation"></script>
+    <script src="character/visual_parameter_controller.js?v=20260923-visual-parameter-controller"></script>
+    <script src="character/gesture_motion.js?v=20260923-gesture-motion"></script>
+    <script src="character/native_motion_controller.js?v=20260923-native-motion-controller"></script>
+    <script src="character/background_renderer.js?v=20260923-background-renderer"></script>
+    <script src="character/mouth_parameter_renderer.js?v=20260923-mouth-parameter-renderer"></script>
+    <script src="character/parameter_renderer.js?v=20260923-parameter-renderer"></script>
+    <script src="window_resize.js?v=20260911"></script>
+    <script src="background_editor.js?v=20261025-model-profiles"></script>
+    <script src="chat/history_search.js?v=20260921"></script>
+    <script src="chat/conversation_picker.js?v=20260921-conversation-picker-controller"></script>
+    <script src="chat/bookmarks.js?v=20260921-bookmarks-controller"></script>
+    <script src="chat/message_view.js?v=20261102-gallery-ten"></script>
+    <script src="chat/conversation_state.js?v=20260923-conversation-state-controller"></script>
+    <script src="audio/mouth_shapes.js?v=20260921"></script>
+    <script src="chat/speech_playback.js?v=20260921"></script>
+    <script src="chat/chat_controller.js?v=20261031-quiet-delivery"></script>
+    <script src="chat/thinking_indicator.js?v=20261031-waiting-icon"></script>
+    <script src="settings/settings_controller.js?v=20261025-settings-controller"></script>
+    <script src="settings/life_controller.js?v=20261109-public-reading-layout"></script>
+    <script src="settings/update_controller.js?v=20261022-update-controller"></script>
+    <script src="settings/model_profile_controller.js?v=20261025-model-profile-editor"></script>
+    <script src="settings/api_verification.js?v=20261025-api-verification-controller"></script>
+    <script src="character/touch_interaction.js?v=20260923-touch-interaction-controller"></script>
+    <script src="character/model_transform_controller.js?v=20260923-model-transform-controller"></script>
+    <script src="developer/salieri_panel.js?v=20260923-salieri-panel-controller"></script>
+    <script src="developer/voice_diagnostics.js?v=20260923-voice-diagnostics-controller"></script>
+    <script src="developer/persona_controller.js?v=20260923-persona-controller"></script>
+    <script src="developer/relationship_controller.js?v=20260923-relationship-controller"></script>
+    <script src="developer/emotion_controller.js?v=20260923-emotion-controller"></script>
+    <script src="developer/model_editor.js?v=20260923-model-editor-controller"></script>
+    <script src="developer/voice_reference_controller.js?v=20260923-voice-reference-controller"></script>
+    <script src="developer/parameter_lab.js?v=20260923-parameter-lab"></script>
+    <script src="live2d_app.js?v=20261109-scheduled-speech"></script>
+      <script src="wensheng_mic.js"></script>
+  </body>
+</html>

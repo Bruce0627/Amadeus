@@ -1,6 +1,6 @@
 # Amadeus System：加入簡易自主生活
 
-[English](README.en.md)
+[English](README.en.md) · [本機版快速開始](快速開始.md)
 
 在 Windows 桌面上和 Amadeus 聊天。
 

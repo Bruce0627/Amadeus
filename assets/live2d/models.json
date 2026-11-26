@@ -1,0 +1,192 @@
+{
+  "defaultId": "aipoet-kurisu",
+  "models": [
+    {
+      "id": "aipoet-kurisu",
+      "label": "标准实验服",
+      "description": "经典半身模型的标准实验服，与日常服共用脸部、表情和动作。",
+      "modelUrl": "/assets/live2d/AiPoetKurisu/kurisu.model3.json",
+      "fullScaleMultiplier": 0.9,
+      "supportsNativeExpressions": true,
+      "interactionSummary": "表情文件负责情绪；轻触和对话动作调用经典动作组；眼睛、头部与身体参数持续独立驱动。",
+      "lipSync": {
+        "openMultiplier": 1.2,
+        "formMultiplier": 1.12,
+        "openSmoothing": 0.5,
+        "formSmoothing": 0.34
+      },
+      "eyeVisibilityCompensation": {
+        "sustainedDelayMs": 220,
+        "minimumVisibleOpening": 0.42,
+        "closeThreshold": 0.32,
+        "families": {
+          "default": [[0, 0, 0, 0], [0.14, 0.06, 0, 0], [0.42, 0.5, -0.12, 0], [0.56, 0.9, -0.04, 0], [0.68, 1, 0, 0]],
+          "smile": [[0, 0, 0, 0], [0.18, 0.08, 0, 0], [0.42, 0.52, -0.08, 0], [0.58, 0.92, -0.03, 0], [0.72, 1, 0, 0]],
+          "coldGlance": [[0, 0, 0, 0], [0.16, 0.08, 0, 0], [0.42, 0.56, -0.1, 0], [0.54, 0.9, -0.03, 0], [0.66, 1, 0, 0]]
+        }
+      },
+      "headTurn": {
+        "maxYaw": 78,
+        "auxiliaryMax": 25,
+        "bodyMax": 2.2,
+        "pointerSwitchThreshold": 0.3,
+        "springFrequency": 5.6,
+        "springDamping": 0.86
+      },
+      "hiddenParameters": [
+        "AY", "BB", "DZH", "KLSTN", "Tucao", "TX", "TC", "close", "tc",
+        "logo", "music", "guan_yu_zuo_zhe_", "zuo_zhe", "bj"
+      ],
+      "fixedParameters": {
+        "logo": 0.01,
+        "music": 0,
+        "guan_yu_zuo_zhe_": 0,
+        "zuo_zhe": 0,
+        "hu_dong": 1,
+        "amadeus": 1,
+        "connect_select": 1,
+        "xl": 1,
+        "bj": 0
+      },
+      "parameterAliases": {
+        "blush": ["ParamCheek"],
+        "eyeSmile": ["ParamEyeLSmile", "ParamEyeRSmile"],
+        "browLY": ["ParamBrowLY"],
+        "browRY": ["ParamBrowRY"],
+        "browLForm": ["ParamBrowLForm"],
+        "browRForm": ["ParamBrowRForm"]
+      },
+      "expressionMap": {
+        "neutral": "",
+        "thinking": "",
+        "focused": "",
+        "skeptical": "",
+        "awkward": "",
+        "annoyed": "",
+        "furious": "",
+        "teasing": "",
+        "amused": "",
+        "laughing": "",
+        "shy": "",
+        "flustered": "",
+        "affectionate": "",
+        "concerned": "",
+        "protective": "",
+        "excited": "",
+        "startled": "",
+        "proud": "",
+        "melancholic": ""
+      },
+      "motionMap": {
+        "boot": "random1",
+        "tap": "random2",
+        "recoil": "surprise",
+        "explain": "random3",
+        "perk": "joy",
+        "lean": "",
+        "happy": "",
+        "shy": "",
+        "angry": "anger",
+        "startled": "surprise",
+        "sad": "sadness",
+        "proud": "joy",
+        "focused": "unhappy"
+      }
+    },
+    {
+      "id": "aipoet-kurisu-daily",
+      "label": "日常服",
+      "description": "保留经典版脸部、表情和动作；白衬衫、红领带与滑落到上臂的棕色外套。",
+      "modelUrl": "/assets/live2d/AiPoetKurisuDaily/kurisu-daily.model3.json",
+      "fullScaleMultiplier": 0.9,
+      "supportsNativeExpressions": true,
+      "interactionSummary": "表情文件负责情绪；轻触和对话动作调用经典动作组；眼睛、头部与身体参数持续独立驱动。",
+      "lipSync": {
+        "openMultiplier": 1.2,
+        "formMultiplier": 1.12,
+        "openSmoothing": 0.5,
+        "formSmoothing": 0.34
+      },
+      "eyeVisibilityCompensation": {
+        "sustainedDelayMs": 220,
+        "minimumVisibleOpening": 0.42,
+        "closeThreshold": 0.32,
+        "families": {
+          "default": [[0, 0, 0, 0], [0.14, 0.06, 0, 0], [0.42, 0.5, -0.12, 0], [0.56, 0.9, -0.04, 0], [0.68, 1, 0, 0]],
+          "smile": [[0, 0, 0, 0], [0.18, 0.08, 0, 0], [0.42, 0.52, -0.08, 0], [0.58, 0.92, -0.03, 0], [0.72, 1, 0, 0]],
+          "coldGlance": [[0, 0, 0, 0], [0.16, 0.08, 0, 0], [0.42, 0.56, -0.1, 0], [0.54, 0.9, -0.03, 0], [0.66, 1, 0, 0]]
+        }
+      },
+      "headTurn": {
+        "maxYaw": 78,
+        "auxiliaryMax": 25,
+        "bodyMax": 2.2,
+        "pointerSwitchThreshold": 0.3,
+        "springFrequency": 5.6,
+        "springDamping": 0.86
+      },
+      "hiddenParameters": [
+        "AY", "BB", "DZH", "KLSTN", "Tucao", "TX", "TC", "close", "tc",
+        "logo", "music", "guan_yu_zuo_zhe_", "zuo_zhe", "bj"
+      ],
+      "fixedParameters": {
+        "logo": 0.01,
+        "music": 0,
+        "guan_yu_zuo_zhe_": 0,
+        "zuo_zhe": 0,
+        "hu_dong": 1,
+        "amadeus": 1,
+        "connect_select": 1,
+        "xl": 1,
+        "bj": 0
+      },
+      "parameterAliases": {
+        "blush": ["ParamCheek"],
+        "eyeSmile": ["ParamEyeLSmile", "ParamEyeRSmile"],
+        "browLY": ["ParamBrowLY"],
+        "browRY": ["ParamBrowRY"],
+        "browLForm": ["ParamBrowLForm"],
+        "browRForm": ["ParamBrowRForm"]
+      },
+      "expressionMap": {
+        "neutral": "",
+        "thinking": "",
+        "focused": "",
+        "skeptical": "",
+        "awkward": "",
+        "annoyed": "",
+        "furious": "",
+        "teasing": "",
+        "amused": "",
+        "laughing": "",
+        "shy": "",
+        "flustered": "",
+        "affectionate": "",
+        "concerned": "",
+        "protective": "",
+        "excited": "",
+        "startled": "",
+        "proud": "",
+        "melancholic": ""
+      },
+      "motionMap": {
+        "boot": "random1",
+        "tap": "random2",
+        "recoil": "surprise",
+        "explain": "random3",
+        "perk": "joy",
+        "lean": "",
+        "happy": "",
+        "shy": "",
+        "angry": "anger",
+        "startled": "surprise",
+        "sad": "sadness",
+        "proud": "joy",
+        "focused": "unhappy"
+      },
+      "baseModelId": "aipoet-kurisu",
+      "armPoseMode": "endpoints",
+      "garmentRigUrl": "/assets/live2d/AiPoetKurisuDaily/jacket-rig.json"
+    }
+  ]
+}

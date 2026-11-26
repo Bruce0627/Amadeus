@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "defaultPreset": "emotionclarity_v7_retrained_short",
+  "supportedPresets": ["emotionclarity_v7_retrained_short"],
+  "sovitsModelSource": "bootstrapSovitsModel",
+  "presetRevision": 10
+}

@@ -1,0 +1,114 @@
+"""Adapt provider function calls to the existing conversation tool executor."""
+from __future__ import annotations
+
+import json
+from typing import Any, Mapping
+from urllib.parse import urlsplit
+
+from agent.tool_architecture import WEB_TOOL_NAMES
+
+WEB_NAMES = WEB_TOOL_NAMES
+
+
+def native_web_enabled(settings: Mapping[str, Any], body: Mapping[str, Any], purpose: str) -> bool:
+    # This provider's function calling is verified by the live comparison probe.
+    # Other endpoints keep their existing JSON tool protocol.
+    plan = body.get("_turnExecutionPlan") or {}
+    required_web = bool(set(plan.get("requiredCapabilities") or []) & WEB_NAMES)
+    web_in_progress = any(
+        isinstance(item, Mapping) and item.get("sourceType") == "tool"
+        and not item.get("historical")
+        and (item.get("name") or (item.get("receipt") or {}).get("name")) in WEB_NAMES
+        for item in (body.get("_cognitiveEvidence") or {}).values()
+    )
+    return (
+        bool(settings.get("permissionWebSearch"))
+        and (required_web or web_in_progress)
+        and urlsplit(str(settings.get("apiEndpoint") or "")).hostname == "api.deepseek.com"
+        and plan.get("researchPolicy") != "forbidden"
+        and (purpose in {"chat_primary", "chat_tool_followup", "chat_fast_stream", "chat_fast_utterance_stream"}
+             or purpose.startswith("chat_tool_query_loop_round_"))
+    )
+
+
+def prepare_native_web_payload(payload: Mapping[str, Any], body: Mapping[str, Any]) -> dict[str, Any]:
+    active = dict(payload)
+    # The final provider adapter may continue through our existing JSON tools
+    # when thinking-mode history lacks the provider's reasoning metadata.
+    active['_amadeusJsonToolFallback'] = True
+    definitions = [
+        ("web_search", "Search public web information; returns titles, URLs, date provenance, snippets and bounded page bodies when enabled. Read missing passages with read_web_page.",
+         {"query": {"type": "string"}, "provider": {"type": "string", "enum": ["deepseek", "duckduckgo", "bing", "yahoo", "wikipedia", "brave"]},
+          "freshness": {"type": "string", "enum": ["pd", "pw", "pm", "py"]},
+          "researchDepth": {"type": "string", "enum": ["quick", "standard", "deep", "exhaustive"]},
+          "researchTopic": {"type": "string", "enum": ["general", "news", "academic"]},
+          "maxResults": {"type": "integer", "minimum": 1, "maximum": 20},
+          "domains": {"type": "array", "items": {"type": "string"}},
+          "offset": {"type": "integer", "minimum": 0},
+          "locale": {"type": "string"}}, "query"),
+        ("read_web_page", "Read a public webpage or linked document to answer the requested question.",
+         {"url": {"type": "string"}, "researchQuery": {"type": "string"},
+          "researchDepth": {"type": "string", "enum": ["quick", "standard", "deep", "exhaustive"]},
+          "searchProvider": {"type": "string"},
+          "find": {"type": "string"}, "startChar": {"type": "integer", "minimum": 0},
+          "maxChars": {"type": "integer", "minimum": 1, "maximum": 14000}}, "url"),
+        ("public_read", "Read public content without login or posting. Use source=bluesky with search|posts|account|thread; source=bangumi with search|subject|detail; source=arxiv with search|abstract|detail (abstract/detail use id); or source=rss with feed (url is the subscription URL).",
+         {"source": {"type": "string", "enum": ["bluesky", "bangumi", "arxiv", "rss"]},
+          "operation": {"type": "string", "enum": ["search", "posts", "account", "thread", "subject", "detail", "abstract", "feed"]},
+          "query": {"type": "string"}, "actor": {"type": "string"},
+          "uri": {"type": "string"}, "id": {"type": "string"},
+          "url": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+          "cursor": {"type": "string"}}, ("source", "operation")),
+    ]
+    active["tools"] = [{"type": "function", "function": {
+        "name": name, "description": description, "parameters": {
+            "type": "object", "properties": properties,
+            "required": [required] if isinstance(required, str) else list(required),
+            "additionalProperties": False,
+        },
+    }} for name, description, properties, required in definitions]
+    plan = body.get("_turnExecutionPlan") or {}
+    evidence = body.get("_cognitiveEvidence") or {}
+    attempted = any(
+        isinstance(item, Mapping) and item.get("sourceType") == "tool"
+        and not item.get("historical")
+        and (item.get("name") or (item.get("receipt") or {}).get("name")) in WEB_NAMES
+        and item.get("executionStatus") != "not_attempted"
+        for item in evidence.values()
+    )
+    required = bool(set(plan.get("requiredCapabilities") or []) & WEB_NAMES)
+    active["tool_choice"] = "required" if required and not attempted else "auto"
+    if active["tool_choice"] == "required":
+        # DeepSeek's documented forced-tool mode excludes thinking mode.
+        active["thinking"] = {"type": "disabled"}
+        active.pop("reasoning_effort", None)
+    # Native function arguments have their own schema. Final speech still uses
+    # the conversation JSON contract in the prompt and its existing validator.
+    active.pop("response_format", None)
+    active["stream"] = False
+    active["messages"] = [*active.get("messages", []), {"role": "system", "content":
+        "本轮提供原生联网函数。搜索、读网页或读取公开 Bluesky/Bangumi/arXiv/RSS 内容直接使用这些函数；"
+        "函数结果会作为工具证据返回。"
+        "其他工具继续使用原来的 kind=tool_use/calls。资料够用后按原有对话 JSON 容器给出最终回答。"}]
+    return active
+
+
+def bind_native_web_context(content: str, body: Mapping[str, Any]) -> str:
+    try:
+        value = json.loads(content)
+    except (ValueError, TypeError):
+        return content
+    if not isinstance(value, dict):
+        return content
+    native_calls = bool(value.pop("_nativeToolCalls", False))
+    native_web_calls = bool(value.pop("_nativeWebToolCalls", False))
+    if not (native_calls or native_web_calls):
+        return content
+    snapshot = body.get("_turnContextSnapshot") or {}
+    message = snapshot.get("currentUserMessage") or {}
+    request = str(message.get("text") or body.get("userMessage") or "")
+    if not isinstance(value.get("cognitive"), dict):
+        # Native function calls need no fabricated state edits. Bind the real
+        # request and let the existing executor apply normal permission and argument checks.
+        value["cognitive"] = {"interactionAct": "CHAT", "understoodGoal": request, "patches": []}
+    return json.dumps(value, ensure_ascii=False)

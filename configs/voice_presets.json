@@ -1,0 +1,27 @@
+{
+  "emotionclarity_v7_retrained_short": {
+    "label": "当前语音",
+    "description": "中文使用清晰发音方案，日文沿用原有发音方式；两种语言保持同一音色。",
+    "gptModel": ".runtime-assets/voice/emotiondetail_v4-e2.ckpt",
+    "sovitsModel": ".runtime-assets/voice/emotionlite-bootstrap.pth",
+    "bootstrapGptModel": ".runtime-assets/voice/emotionlite-bootstrap.ckpt",
+    "bootstrapSovitsModel": ".runtime-assets/voice/emotionlite-bootstrap.pth",
+    "refAudio": ".runtime-assets/voice/references/audio/CRS_0659.wav",
+    "refText": ".runtime-assets/voice/references/text/calm_normal_CRS_0659.txt",
+    "styleMap": ".runtime-assets/voice/presets/emotionclarity_v7_retrained_short/style_map.json",
+    "gptModelRoutes": {
+      "short": ".runtime-assets/voice/weights/emotionclean_v2_l_emotionlite_lr0021-e2.ckpt"
+    },
+    "gptRouteShortMaxChars": 32,
+    "gptRouteLongMinChars": 60
+  },
+  "custom": {
+    "label": "自定义路径",
+    "description": "手动填写权重、参考音频和 style map。",
+    "gptModel": "",
+    "sovitsModel": "",
+    "refAudio": "",
+    "refText": "",
+    "styleMap": ""
+  }
+}
